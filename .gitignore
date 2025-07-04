@@ -1,5 +1,8 @@
-# Data
-data/**
+backup/
+data/
+storage/
 lean.json
-.idea
-.vscode
+__pycache__/
+.idea/
+.vscode/
+backtests/
