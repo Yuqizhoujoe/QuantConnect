@@ -7,6 +7,8 @@ from trade_executor import TradeExecutor
 from scheduler import Scheduler
 from evaluator import Evaluator
 from config_loader import ConfigLoader
+from risk_manager import RiskManager
+from market_analyzer import MarketAnalyzer
 # endregion
 
 class ConfigurableShortPutStrategy(QCAlgorithm):
@@ -43,10 +45,13 @@ class ConfigurableShortPutStrategy(QCAlgorithm):
         self.profit_loss = 0              # Running total of profit and loss
         self.trades = []                  # A list to store details of each trade
         self.daily_pnl = []               # A list to track daily profit and loss
+        self.peak_portfolio_value = self.Portfolio.TotalPortfolioValue  # Track peak for drawdown calculation
 
         # --- Initialize Helper Modules ---
         # Each module handles a specific part of the strategy's logic.
         self.data_handler = DataHandler(self)
+        self.risk_manager = RiskManager(self)
+        self.market_analyzer = MarketAnalyzer(self)
         self.position_manager = PositionManager(self, self.data_handler)
         self.trade_executor = TradeExecutor(self)
         self.scheduler = Scheduler(self, self.position_manager)

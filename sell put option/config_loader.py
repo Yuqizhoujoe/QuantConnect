@@ -97,5 +97,27 @@ class ConfigLoader:
         # Set the initial cash for the backtest.
         self.algorithm.SetCash(parameters.get('cash', StrategyConfig.CASH))
         
+        # Load risk management configuration
+        risk_config = parameters.get('risk_management', {})
+        self.algorithm.max_portfolio_risk = risk_config.get('max_portfolio_risk', 0.02)
+        self.algorithm.max_drawdown = risk_config.get('max_drawdown', 0.15)
+        self.algorithm.volatility_lookback = risk_config.get('volatility_lookback', 20)
+        self.algorithm.volatility_threshold = risk_config.get('volatility_threshold', 0.4)
+        
+        # Load market analysis configuration
+        market_config = parameters.get('market_analysis', {})
+        self.algorithm.rsi_period = market_config.get('rsi_period', 14)
+        self.algorithm.moving_average_period = market_config.get('moving_average_period', 50)
+        self.algorithm.market_volatility_lookback = market_config.get('volatility_lookback', 20)
+        
+        # Load plotting configuration
+        plotting_config = parameters.get('plotting', {})
+        self.algorithm.plotting_enabled = plotting_config.get('enabled', True)
+        self.algorithm.plot_frequency = plotting_config.get('plot_frequency', 50)
+        self.algorithm.max_plot_points = plotting_config.get('max_plot_points', 3500)
+        self.algorithm.plot_risk_metrics = plotting_config.get('plot_risk_metrics', True)
+        self.algorithm.plot_pnl = plotting_config.get('plot_pnl', True)
+        
         # Log the configuration being used
         self.algorithm.Log(f"Configuration loaded - Ticker: {self.algorithm.ticker}, Delta Range: {self.algorithm.target_delta_min}-{self.algorithm.target_delta_max}, Position Size: {self.algorithm.max_position_size}")
+        self.algorithm.Log(f"Plotting enabled: {self.algorithm.plotting_enabled}, Frequency: {self.algorithm.plot_frequency}, Max Points: {self.algorithm.max_plot_points}")
