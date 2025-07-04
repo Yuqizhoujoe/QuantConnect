@@ -1,6 +1,15 @@
 {
     "algorithm-language": "Python",
-    "parameters": {},
-    "description": "",
+    "parameters": {
+        "ticker": "AVGO",
+        "target_delta_min": 0.30,
+        "target_delta_max": 0.50,
+        "max_position_size": 0.20,
+        "option_frequency": "monthly",
+        "start_date": "2020-01-01",
+        "end_date": "2025-01-01",
+        "cash": 100000
+    },
+    "description": "A strategy that sells monthly put options on a specified ticker.",
     "local-id": 726152797
 }
