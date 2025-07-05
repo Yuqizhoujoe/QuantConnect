@@ -38,8 +38,12 @@ class Scheduler:
         It delegates position management to the PortfolioManager.
         """
         try:
-            # Delegate all position management to the portfolio manager
-            # This handles both closing existing positions and finding new opportunities
-            self.portfolio_manager.manage_positions()
+            # Only manage positions if we have current data
+            if self.algorithm.CurrentSlice is not None:
+                # Delegate all position management to the portfolio manager
+                # This handles both closing existing positions and finding new opportunities
+                self.portfolio_manager.manage_positions()
+            else:
+                self.algorithm.Debug("Skipping position management - no current data available")
         except Exception as e:
             self.algorithm.Log(f"Error in EvaluateOptionStrategy: {str(e)}")

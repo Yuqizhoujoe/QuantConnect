@@ -155,19 +155,22 @@ class PortfolioManager:
         """
         Manage all positions in the portfolio.
         """
-        # First, check for positions that should be closed
-        for stock_manager in self.stock_managers.values():
-            if stock_manager.should_close_position():
-                stock_manager.close_position()
+        try:
+            # First, check for positions that should be closed
+            for stock_manager in self.stock_managers.values():
+                if stock_manager.should_close_position():
+                    stock_manager.close_position()
+                    
+            # Then, look for new trading opportunities
+            if not self.should_trade_portfolio():
+                return
                 
-        # Then, look for new trading opportunities
-        if not self.should_trade_portfolio():
-            return
-            
-        # Find the best trading opportunity
-        best_stock = self._find_best_trading_opportunity()
-        if best_stock:
-            best_stock.find_and_enter_position()
+            # Find the best trading opportunity
+            best_stock = self._find_best_trading_opportunity()
+            if best_stock:
+                best_stock.find_and_enter_position()
+        except Exception as e:
+            self.algorithm.Log(f"Error in manage_positions: {str(e)}")
             
     def _find_best_trading_opportunity(self) -> Optional[StockManager]:
         """
@@ -244,9 +247,15 @@ class PortfolioManager:
         Returns:
             Dictionary with portfolio metrics
         """
+        # Calculate total trades from all stock managers
+        total_trades = sum(stock_manager.trade_count for stock_manager in self.stock_managers.values())
+        
+        # Calculate total portfolio PnL from all stock managers
+        total_portfolio_pnl = sum(stock_manager.profit_loss for stock_manager in self.stock_managers.values())
+        
         metrics = {
-            'total_trades': self.total_trades,
-            'portfolio_pnl': self.portfolio_pnl,
+            'total_trades': total_trades,
+            'portfolio_pnl': total_portfolio_pnl,
             'current_value': self.algorithm.Portfolio.TotalPortfolioValue,
             'peak_value': self.peak_portfolio_value,
             'drawdown': (self.peak_portfolio_value - self.algorithm.Portfolio.TotalPortfolioValue) / self.peak_portfolio_value,

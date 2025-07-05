@@ -189,11 +189,18 @@ class RiskManager:
         Returns:
             Volatility adjustment factor (0.7 to 1.2)
         """
-        if len(self.algorithm.daily_pnl) < self.volatility_lookback:
+        # Get daily PnL from portfolio manager if available
+        all_daily_pnl = []
+        if hasattr(self.algorithm, 'portfolio_manager') and self.algorithm.portfolio_manager:
+            for stock_manager in self.algorithm.portfolio_manager.stock_managers.values():
+                if hasattr(stock_manager, 'daily_pnl'):
+                    all_daily_pnl.extend(stock_manager.daily_pnl)
+        
+        if len(all_daily_pnl) < self.volatility_lookback:
             return 1.0  # Default factor when insufficient data
             
         # Calculate volatility from recent PnL data
-        recent_pnl: List[float] = self.algorithm.daily_pnl[-self.volatility_lookback:]
+        recent_pnl: List[float] = all_daily_pnl[-self.volatility_lookback:]
         volatility: float = np.std(recent_pnl)
         
         # Adjust position size based on volatility regime
@@ -213,7 +220,14 @@ class RiskManager:
         Returns:
             Win rate as a decimal (0.0 to 1.0)
         """
-        completed_trades = [t for t in self.algorithm.trades if 'pnl' in t]
+        # Get all trades from portfolio manager if available
+        all_trades = []
+        if hasattr(self.algorithm, 'portfolio_manager') and self.algorithm.portfolio_manager:
+            for stock_manager in self.algorithm.portfolio_manager.stock_managers.values():
+                if hasattr(stock_manager, 'trades'):
+                    all_trades.extend(stock_manager.trades)
+        
+        completed_trades = [t for t in all_trades if 'pnl' in t]
         if not completed_trades:
             return 0.6  # Default assumption for new strategies
             
@@ -227,7 +241,14 @@ class RiskManager:
         Returns:
             Average dollar amount of winning trades
         """
-        completed_trades = [t for t in self.algorithm.trades if 'pnl' in t and t['pnl'] > 0]
+        # Get all trades from portfolio manager if available
+        all_trades = []
+        if hasattr(self.algorithm, 'portfolio_manager') and self.algorithm.portfolio_manager:
+            for stock_manager in self.algorithm.portfolio_manager.stock_managers.values():
+                if hasattr(stock_manager, 'trades'):
+                    all_trades.extend(stock_manager.trades)
+        
+        completed_trades = [t for t in all_trades if 'pnl' in t and t['pnl'] > 0]
         if not completed_trades:
             return 100  # Default assumption
         return np.mean([t['pnl'] for t in completed_trades])
@@ -239,7 +260,14 @@ class RiskManager:
         Returns:
             Average dollar amount of losing trades (absolute value)
         """
-        completed_trades = [t for t in self.algorithm.trades if 'pnl' in t and t['pnl'] < 0]
+        # Get all trades from portfolio manager if available
+        all_trades = []
+        if hasattr(self.algorithm, 'portfolio_manager') and self.algorithm.portfolio_manager:
+            for stock_manager in self.algorithm.portfolio_manager.stock_managers.values():
+                if hasattr(stock_manager, 'trades'):
+                    all_trades.extend(stock_manager.trades)
+        
+        completed_trades = [t for t in all_trades if 'pnl' in t and t['pnl'] < 0]
         if not completed_trades:
             return 200  # Default assumption
         return abs(np.mean([t['pnl'] for t in completed_trades]))
@@ -257,12 +285,19 @@ class RiskManager:
         """
         # Check 1: Maximum drawdown limit
         current_value = self.algorithm.Portfolio.TotalPortfolioValue
-        if current_value < self.algorithm.peak_portfolio_value * (1 - self.max_drawdown):
-            return True
+        if hasattr(self.algorithm, 'peak_portfolio_value'):
+            if current_value < self.algorithm.peak_portfolio_value * (1 - self.max_drawdown):
+                return True
             
         # Check 2: Consecutive losses limit
-        if self.algorithm.trades:
-            recent_trades = [t for t in self.algorithm.trades[-5:] if 'pnl' in t]
+        all_trades = []
+        if hasattr(self.algorithm, 'portfolio_manager') and self.algorithm.portfolio_manager:
+            for stock_manager in self.algorithm.portfolio_manager.stock_managers.values():
+                if hasattr(stock_manager, 'trades'):
+                    all_trades.extend(stock_manager.trades)
+        
+        if all_trades:
+            recent_trades = [t for t in all_trades[-5:] if 'pnl' in t]
             if len(recent_trades) >= 3:
                 consecutive_losses = sum(1 for t in recent_trades if t['pnl'] < 0)
                 if consecutive_losses >= 3:
@@ -279,12 +314,24 @@ class RiskManager:
         Returns:
             Dictionary containing current risk metrics
         """
-        return {
-            'portfolio_value': self.algorithm.Portfolio.TotalPortfolioValue,
-            'margin_used': self.algorithm.Portfolio.TotalMarginUsed,
-            'margin_remaining': self.algorithm.Portfolio.MarginRemaining,
-            'win_rate': self.get_historical_win_rate(),
-            'avg_win': self.get_average_win(),
-            'avg_loss': self.get_average_loss(),
-            'volatility': self.get_volatility_adjustment()
-        } 
+        try:
+            return {
+                'portfolio_value': self.algorithm.Portfolio.TotalPortfolioValue,
+                'margin_used': self.algorithm.Portfolio.TotalMarginUsed,
+                'margin_remaining': self.algorithm.Portfolio.MarginRemaining,
+                'win_rate': self.get_historical_win_rate(),
+                'avg_win': self.get_average_win(),
+                'avg_loss': self.get_average_loss(),
+                'volatility': self.get_volatility_adjustment()
+            }
+        except Exception as e:
+            # Return default metrics if there's an error
+            return {
+                'portfolio_value': self.algorithm.Portfolio.TotalPortfolioValue,
+                'margin_used': 0,
+                'margin_remaining': 0,
+                'win_rate': 0.6,
+                'avg_win': 100,
+                'avg_loss': 200,
+                'volatility': 1.0
+            } 

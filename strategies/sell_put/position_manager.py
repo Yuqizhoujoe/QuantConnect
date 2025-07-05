@@ -134,15 +134,24 @@ class PositionManager:
         
         The strategy adapts to market conditions rather than using fixed parameters.
         """
-        # Step 1: Validate data availability
-        slice_data: Any = self.data_handler.latest_slice
+        # Step 1: Validate data availability - use current slice from algorithm
+        slice_data: Any = self.algorithm.CurrentSlice
         if not slice_data:
-            self.algorithm.Debug("No data available for evaluation")
+            self.algorithm.Debug(f"No current slice data available for {self.ticker}")
+            return
+            
+        if not hasattr(slice_data, 'OptionChains') or slice_data.OptionChains is None:
+            self.algorithm.Debug(f"No option chains data available for {self.ticker}")
             return
 
-        chain: Any = slice_data.OptionChains.get(self.algorithm.option_symbols.get(self.ticker))
+        option_symbol: Any = self.algorithm.option_symbols.get(self.ticker)
+        if not option_symbol:
+            self.algorithm.Debug(f"No option symbol found for {self.ticker}")
+            return
+
+        chain: Any = slice_data.OptionChains.get(option_symbol)
         if not chain:
-            self.algorithm.Debug("No option chain available")
+            self.algorithm.Debug(f"No option chain available for {self.ticker}")
             return
 
         underlying_price: float = chain.Underlying.Price

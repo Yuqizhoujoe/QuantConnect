@@ -1,8 +1,7 @@
 
 # region imports
 from AlgorithmImports import *
-from typing import Dict, List, Any, Optional
-from datetime import date
+from typing import Dict, List, Any
 from .portfolio_manager import PortfolioManager
 from config.common_config_loader import ConfigLoader
 from core.scheduler import Scheduler
@@ -53,10 +52,8 @@ class ConfigurableShortPutStrategy(QCAlgorithm):
                 self.Log(f"Added subscriptions for {ticker}")
 
         # --- Portfolio State Variables ---
-        self.total_trades: int = 0              # Counter for total trades across all stocks
-        self.portfolio_pnl: float = 0.0             # Running total of portfolio profit and loss
-        self.portfolio_trades: List[Dict[str, Any]] = []         # List to store details of all trades
-        self.daily_portfolio_pnl: List[float] = []      # List to track daily portfolio profit and loss
+        # Note: All portfolio tracking is now handled by the PortfolioManager
+        # These variables are kept for compatibility but not actively used
         self.peak_portfolio_value: float = self.Portfolio.TotalPortfolioValue
 
         # --- Initialize Portfolio Management ---
@@ -113,10 +110,6 @@ class ConfigurableShortPutStrategy(QCAlgorithm):
         This method delegates the final evaluation and logging to the Evaluator module.
         """
         self.evaluator.on_end_of_algorithm()
-        
-        # Log final portfolio metrics
-        metrics: Dict[str, Any] = self.portfolio_manager.get_portfolio_metrics()
-        self.Log(f"Final Portfolio Metrics: {metrics}")
 
 
 class SellPutOption(ConfigurableShortPutStrategy):

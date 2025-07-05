@@ -27,7 +27,8 @@ class DataHandler:
         Args:
             slice_data: Latest data slice from the algorithm
         """
-        self.latest_slice = slice_data
+        if slice_data is not None:
+            self.latest_slice = slice_data
 
     def on_data(self, slice: Slice) -> None:
         """

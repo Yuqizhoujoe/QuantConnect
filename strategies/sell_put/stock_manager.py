@@ -136,22 +136,12 @@ class StockManager:
         if not self.should_trade():
             return
             
-        # Get option chain for this stock
-        option_symbol: Optional[Any] = self.algorithm.option_symbols.get(self.ticker)
-        if not option_symbol:
-            return
-            
-        slice_data: Any = self.data_handler.latest_slice
-        if not slice_data:
-            return
-            
-        chain: Any = slice_data.OptionChains.get(option_symbol)
-        if not chain:
-            return
-            
         # Use position manager to find and enter position
-        # The position manager will handle all the logic internally
-        self.position_manager.find_and_enter_position()
+        # The position manager will handle all the logic internally and has proper data validation
+        try:
+            self.position_manager.find_and_enter_position()
+        except Exception as e:
+            self.algorithm.Log(f"Error in find_and_enter_position for {self.ticker}: {str(e)}")
             
     def close_position(self) -> None:
         """

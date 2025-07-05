@@ -1,6 +1,6 @@
 # region imports
 from AlgorithmImports import *
-from strategies.sell_put.main import SellPutOption
+from strategies import SellPutOption
 # endregion
 
 class Main(SellPutOption):

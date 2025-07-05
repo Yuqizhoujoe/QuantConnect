@@ -8,7 +8,7 @@ isolated components and logic:
 - Other strategies (future)
 """
 
-from .sell_put import SellPutOption, ConfigurableShortPutStrategy
+from .sell_put.main import SellPutOption, ConfigurableShortPutStrategy
 
 __all__ = [
     'SellPutOption',
