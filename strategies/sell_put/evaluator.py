@@ -1,22 +1,23 @@
 
 from AlgorithmImports import *
 import numpy as np
+from typing import Any, List, Dict, Optional
 
 class Evaluator:
     """
     Handles the performance evaluation and logging for the algorithm.
     This class calculates and displays key performance metrics at the end of the backtest.
     """
-    def __init__(self, algorithm):
+    def __init__(self, algorithm: Any) -> None:
         """
         Initializes the Evaluator.
         
         Args:
             algorithm: A reference to the main algorithm instance.
         """
-        self.algorithm = algorithm
+        self.algorithm: Any = algorithm
 
-    def on_end_of_algorithm(self):
+    def on_end_of_algorithm(self) -> None:
         """
         Enhanced end-of-algorithm evaluation with comprehensive performance metrics.
         """
@@ -27,22 +28,22 @@ class Evaluator:
         self.algorithm.Log(f"Total P&L: ${self.algorithm.profit_loss:.2f}")
         
         # Calculate drawdown
-        max_drawdown = (self.algorithm.peak_portfolio_value - self.algorithm.Portfolio.TotalPortfolioValue) / self.algorithm.peak_portfolio_value
+        max_drawdown: float = (self.algorithm.peak_portfolio_value - self.algorithm.Portfolio.TotalPortfolioValue) / self.algorithm.peak_portfolio_value
         self.algorithm.Log(f"Maximum Drawdown: {max_drawdown:.2%}")
 
         if self.algorithm.trades:
             # Enhanced trade analysis
-            completed_trades = [t for t in self.algorithm.trades if 'pnl' in t]
+            completed_trades: List[Dict[str, Any]] = [t for t in self.algorithm.trades if 'pnl' in t]
             if completed_trades:
                 # Initialize variables to avoid scope issues
-                avg_win = None
-                avg_loss = None
-                max_win = None
-                max_loss = None
+                avg_win: Optional[float] = None
+                avg_loss: Optional[float] = None
+                max_win: Optional[float] = None
+                max_loss: Optional[float] = None
                 
                 # Win rate analysis
-                winning_trades = [t for t in completed_trades if t['pnl'] > 0]
-                win_rate = len(winning_trades) / len(completed_trades) * 100
+                winning_trades: List[Dict[str, Any]] = [t for t in completed_trades if t['pnl'] > 0]
+                win_rate: float = len(winning_trades) / len(completed_trades) * 100
                 self.algorithm.Log(f"Win Rate: {win_rate:.1f}%")
 
                 # Profit analysis
@@ -53,7 +54,7 @@ class Evaluator:
                     self.algorithm.Log(f"Maximum Win: ${max_win:.2f}")
 
                 # Loss analysis
-                losing_trades = [t for t in completed_trades if t['pnl'] < 0]
+                losing_trades: List[Dict[str, Any]] = [t for t in completed_trades if t['pnl'] < 0]
                 if losing_trades:
                     avg_loss = np.mean([t['pnl'] for t in losing_trades])
                     max_loss = min([t['pnl'] for t in losing_trades])
@@ -62,33 +63,33 @@ class Evaluator:
 
                 # Risk metrics - only calculate if both values are available
                 if avg_win is not None and avg_loss is not None:
-                    profit_factor = abs(avg_win / avg_loss)
+                    profit_factor: float = abs(avg_win / avg_loss)
                     self.algorithm.Log(f"Profit Factor: {profit_factor:.2f}")
                 
                 # Trade duration analysis
-                durations = []
+                durations: List[int] = []
                 for trade in completed_trades:
                     if 'entry_date' in trade and 'exit_date' in trade:
-                        duration = (trade['exit_date'] - trade['entry_date']).days
+                        duration: int = (trade['exit_date'] - trade['entry_date']).days
                         durations.append(duration)
                 
                 if durations:
-                    avg_duration = np.mean(durations)
+                    avg_duration: float = np.mean(durations)
                     self.algorithm.Log(f"Average Trade Duration: {avg_duration:.1f} days")
                 
                 # Risk-adjusted returns
                 try:
                     if self.algorithm.daily_pnl and len(self.algorithm.daily_pnl) > 1:
-                        returns = np.diff(self.algorithm.daily_pnl)
+                        returns: np.ndarray = np.diff(self.algorithm.daily_pnl)
                         if len(returns) > 0:
-                            sharpe_ratio = np.mean(returns) / np.std(returns) if np.std(returns) > 0 else 0
+                            sharpe_ratio: float = np.mean(returns) / np.std(returns) if np.std(returns) > 0 else 0
                             self.algorithm.Log(f"Sharpe Ratio: {sharpe_ratio:.2f}")
                 except Exception as e:
                     self.algorithm.Log(f"Could not calculate Sharpe ratio: {str(e)}")
         
         # Risk management summary
         try:
-            risk_metrics = self.algorithm.risk_manager.get_risk_metrics()
+            risk_metrics: Dict[str, Any] = self.algorithm.risk_manager.get_risk_metrics()
             self.algorithm.Log(f"Final Win Rate: {risk_metrics['win_rate']:.1%}")
             self.algorithm.Log(f"Final Volatility Factor: {risk_metrics['volatility']:.2f}")
         except Exception as e:

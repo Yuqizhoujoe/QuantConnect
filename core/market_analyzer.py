@@ -1,5 +1,6 @@
 from AlgorithmImports import *
 import numpy as np
+from typing import Dict, List, Any, Optional, Tuple, Union
 
 class MarketAnalyzer:
     """
@@ -15,30 +16,32 @@ class MarketAnalyzer:
     The goal is to adapt the strategy to current market conditions for better performance.
     """
     
-    def __init__(self, algorithm):
+    def __init__(self, algorithm: Any, ticker: str) -> None:
         """
         Initialize the MarketAnalyzer with analysis parameters.
         
         Args:
             algorithm: Reference to the main algorithm instance
+            ticker: Stock ticker symbol for this analyzer
             
         Analysis Parameters:
             volatility_lookback: Days for volatility calculation
             rsi_period: Period for RSI calculation (typically 14)
             moving_average_period: Period for trend analysis (typically 50)
         """
-        self.algorithm = algorithm
+        self.algorithm: Any = algorithm
+        self.ticker: str = ticker
         
         # Technical analysis parameters
-        self.volatility_lookback = 20      # Days for volatility calculation
-        self.rsi_period = 14               # Period for RSI calculation
-        self.moving_average_period = 50    # Period for moving average
+        self.volatility_lookback: int = 20      # Days for volatility calculation
+        self.rsi_period: int = 14               # Period for RSI calculation
+        self.moving_average_period: int = 50    # Period for moving average
         
         # Data storage for analysis
-        self.price_history = []            # Store recent prices for analysis
-        self.volatility_history = []       # Store volatility history
+        self.price_history: List[float] = []            # Store recent prices for analysis
+        self.volatility_history: List[float] = []       # Store volatility history
         
-    def analyze_market_conditions(self, underlying_price):
+    def analyze_market_conditions(self, underlying_price: float) -> Dict[str, Any]:
         """
         Comprehensive market analysis for option trading decisions.
         
@@ -64,7 +67,7 @@ class MarketAnalyzer:
             return self.get_default_analysis()
             
         # Perform comprehensive market analysis
-        analysis = {
+        analysis: Dict[str, Any] = {
             'trend': self.analyze_trend(),
             'volatility': self.analyze_volatility(),
             'rsi': self.calculate_rsi(),
@@ -75,7 +78,7 @@ class MarketAnalyzer:
         
         return analysis
     
-    def update_price_history(self, price):
+    def update_price_history(self, price: float) -> None:
         """
         Update price history for technical analysis.
         
@@ -90,7 +93,7 @@ class MarketAnalyzer:
         if len(self.price_history) > self.volatility_lookback:
             self.price_history.pop(0)
     
-    def analyze_trend(self):
+    def analyze_trend(self) -> str:
         """
         Analyze price trend using moving averages.
         
@@ -102,10 +105,10 @@ class MarketAnalyzer:
         if len(self.price_history) < self.moving_average_period:
             return 'neutral'
             
-        current_price = self.price_history[-1]
+        current_price: float = self.price_history[-1]
         
         # Calculate simple moving average
-        ma = np.mean(self.price_history[-self.moving_average_period:])
+        ma: float = np.mean(self.price_history[-self.moving_average_period:])
         
         # Determine trend based on price vs moving average
         if current_price > ma * 1.02:  # 2% above MA = bullish
@@ -115,7 +118,7 @@ class MarketAnalyzer:
         else:
             return 'neutral'  # Within 2% of MA = neutral
     
-    def analyze_volatility(self):
+    def analyze_volatility(self) -> Dict[str, Union[float, str]]:
         """
         Analyze price volatility using rolling standard deviation.
         
@@ -129,13 +132,13 @@ class MarketAnalyzer:
             return {'current': 0.2, 'historical': 0.2, 'regime': 'normal'}
             
         # Calculate log returns for volatility analysis
-        returns = np.diff(np.log(self.price_history))
+        returns: np.ndarray = np.diff(np.log(self.price_history))
         
         # Current volatility (last 5 days, annualized)
-        current_vol = np.std(returns[-5:]) * np.sqrt(252)
+        current_vol: float = np.std(returns[-5:]) * np.sqrt(252)
         
         # Historical volatility (all available data, annualized)
-        historical_vol = np.std(returns) * np.sqrt(252)
+        historical_vol: float = np.std(returns) * np.sqrt(252)
         
         # Store volatility history for analysis
         self.volatility_history.append(current_vol)
@@ -144,7 +147,7 @@ class MarketAnalyzer:
         
         # Determine volatility regime
         if current_vol > historical_vol * 1.5:
-            regime = 'high'  # Current vol > 150% of historical
+            regime: str = 'high'  # Current vol > 150% of historical
         elif current_vol < historical_vol * 0.7:
             regime = 'low'   # Current vol < 70% of historical
         else:
@@ -156,7 +159,7 @@ class MarketAnalyzer:
             'regime': regime
         }
     
-    def calculate_rsi(self):
+    def calculate_rsi(self) -> float:
         """
         Calculate Relative Strength Index (RSI) momentum indicator.
         
@@ -168,14 +171,14 @@ class MarketAnalyzer:
             RSI value (0-100)
         """
         if len(self.price_history) < self.rsi_period + 1:
-            return 50  # Neutral RSI when insufficient data
+            return 50.0  # Neutral RSI when insufficient data
             
         # Calculate price changes
-        gains = []
-        losses = []
+        gains: List[float] = []
+        losses: List[float] = []
         
         for i in range(1, len(self.price_history)):
-            change = self.price_history[i] - self.price_history[i-1]
+            change: float = self.price_history[i] - self.price_history[i-1]
             if change > 0:
                 gains.append(change)
                 losses.append(0)
@@ -184,23 +187,23 @@ class MarketAnalyzer:
                 losses.append(abs(change))
         
         if len(gains) < self.rsi_period:
-            return 50
+            return 50.0
             
         # Calculate average gains and losses
-        avg_gain = np.mean(gains[-self.rsi_period:])
-        avg_loss = np.mean(losses[-self.rsi_period:])
+        avg_gain: float = np.mean(gains[-self.rsi_period:])
+        avg_loss: float = np.mean(losses[-self.rsi_period:])
         
         if avg_loss == 0:
-            return 100  # All gains, no losses
+            return 100.0  # All gains, no losses
             
         # Calculate RSI: RSI = 100 - (100 / (1 + RS))
         # where RS = Average Gain / Average Loss
-        rs = avg_gain / avg_loss
-        rsi = 100 - (100 / (1 + rs))
+        rs: float = avg_gain / avg_loss
+        rsi: float = 100 - (100 / (1 + rs))
         
         return rsi
     
-    def find_support_resistance(self):
+    def find_support_resistance(self) -> Dict[str, Any]:
         """
         Find support and resistance levels using recent price action.
         
@@ -229,7 +232,7 @@ class MarketAnalyzer:
             'distance_to_support': distance_to_support
         }
     
-    def determine_market_regime(self):
+    def determine_market_regime(self) -> str:
         """
         Determine overall market regime by combining trend and volatility.
         
@@ -261,7 +264,7 @@ class MarketAnalyzer:
         else:
             return 'neutral'     # Normal market conditions
     
-    def analyze_option_premiums(self, chain=None):
+    def analyze_option_premiums(self, chain=None) -> Dict[str, Any]:
         """
         Analyze option premium richness using implied volatility.
         
@@ -308,7 +311,7 @@ class MarketAnalyzer:
         else:
             return {'fair': True, 'rich': False, 'cheap': False}  # Fairly priced
     
-    def get_optimal_delta_range(self, market_analysis):
+    def get_optimal_delta_range(self, market_analysis: Dict[str, Any]) -> Tuple[float, float]:
         """
         Get optimal delta range based on market conditions.
         
@@ -337,7 +340,7 @@ class MarketAnalyzer:
         else:
             return (0.15, 0.40)  # Default range for normal conditions
     
-    def get_optimal_dte_range(self, market_analysis):
+    def get_optimal_dte_range(self, market_analysis: Dict[str, Any]) -> Tuple[int, int]:
         """
         Get optimal days to expiration range based on market conditions.
         
@@ -364,7 +367,7 @@ class MarketAnalyzer:
         else:
             return (30, 60)  # Default range for normal conditions
     
-    def should_avoid_trading(self, market_analysis):
+    def should_avoid_trading(self, market_analysis: Dict[str, Any]) -> bool:
         """
         Determine if we should avoid trading based on market conditions.
         
@@ -393,7 +396,7 @@ class MarketAnalyzer:
             
         return False  # Safe to trade
     
-    def get_default_analysis(self):
+    def get_default_analysis(self) -> Dict[str, Any]:
         """
         Return default analysis when insufficient data is available.
         
