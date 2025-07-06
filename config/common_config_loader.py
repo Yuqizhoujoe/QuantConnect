@@ -1,53 +1,132 @@
-
 import json
 from typing import Dict, Any, Optional, List
+from dataclasses import dataclass, field
+import logging
+import os
+
+
+@dataclass
+class Config:
+    """
+    Simple configuration class to hold all strategy parameters.
+    Now acts as a pure data container; all values are set by the loader.
+    """
+
+    # Portfolio settings
+    total_cash: Optional[int] = None
+    max_stocks: Optional[int] = None
+    max_portfolio_risk: Optional[float] = None
+    max_drawdown: Optional[float] = None
+    correlation_threshold: Optional[float] = None
+
+    # Stock configurations
+    stocks: List[Dict[str, Any]] = field(default_factory=list)
+
+    # Risk management settings
+    volatility_lookback: Optional[int] = None
+    volatility_threshold: Optional[float] = None
+    correlation_lookback: Optional[int] = None
+
+    # Market analysis settings
+    rsi_period: Optional[int] = None
+    moving_average_period: Optional[int] = None
+    market_volatility_lookback: Optional[int] = None
+
+    # Legacy single-stock settings (for backward compatibility)
+    ticker: Optional[str] = None
+    target_delta_min: Optional[float] = None
+    target_delta_max: Optional[float] = None
+    max_position_size: Optional[float] = None
+    option_frequency: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Config":
+        """
+        Create a Config instance from a dictionary with sensible defaults.
+
+        Args:
+            data: Dictionary containing configuration data
+
+        Returns:
+            Config: New Config instance with values from data and defaults
+        """
+        # Handle nested structure where config is under "parameters" key
+        if "parameters" in data:
+            data = data["parameters"]
+
+        # Extract values from nested structure
+        portfolio = data.get("portfolio", {})
+        risk = data.get("risk_management", {})
+        market = data.get("market_analysis", {})
+
+        return cls(
+            # Portfolio settings
+            total_cash=portfolio.get("total_cash", 100000),
+            max_stocks=portfolio.get("max_stocks", 1),
+            max_portfolio_risk=portfolio.get("max_portfolio_risk", 0.02),
+            max_drawdown=portfolio.get("max_drawdown", 0.15),
+            correlation_threshold=portfolio.get("correlation_threshold", 0.7),
+            # Stocks configuration
+            stocks=data.get("stocks", []),
+            # Risk management settings
+            volatility_lookback=risk.get("volatility_lookback", 20),
+            volatility_threshold=risk.get("volatility_threshold", 0.4),
+            correlation_lookback=risk.get("correlation_lookback", 60),
+            # Market analysis settings
+            rsi_period=market.get("rsi_period", 14),
+            moving_average_period=market.get("moving_average_period", 50),
+            market_volatility_lookback=market.get("volatility_lookback", 20),
+            # Legacy single-stock settings
+            ticker=data.get("ticker", "AAPL"),
+            target_delta_min=data.get("target_delta_min", 0.25),
+            target_delta_max=data.get("target_delta_max", 0.75),
+            max_position_size=data.get("max_position_size", 0.20),
+            option_frequency=data.get("option_frequency", "monthly"),
+            start_date=data.get("start_date", "2020-01-01"),
+            end_date=data.get("end_date", "2025-01-01"),
+        )
+
 
 class StrategyConfig:
     """
     Multi-stock configuration class for easy parameter modification.
     Modify these values to change strategy behavior.
     """
+
     # Portfolio settings
     TOTAL_CASH: int = 100000
-    MAX_STOCKS: int = 5
+    MAX_STOCKS: int = 1  # Updated to 1
     MAX_PORTFOLIO_RISK: float = 0.02
     MAX_DRAWDOWN: float = 0.15
     CORRELATION_THRESHOLD: float = 0.7
-    
-    # Stock configurations
+
+    # Stock configurations - Updated to only include AAPL
     STOCKS = [
         {
-            "ticker": "AVGO",
-            "weight": 0.5,
-            "target_delta_min": 0.25,
-            "target_delta_max": 0.75,
-            "max_position_size": 0.20,
-            "option_frequency": "monthly",
-            "enabled": True
-        },
-        {
             "ticker": "AAPL",
-            "weight": 0.5,
+            "weight": 1.0,
             "target_delta_min": 0.25,
             "target_delta_max": 0.75,
             "max_position_size": 0.20,
             "option_frequency": "monthly",
-            "enabled": True
+            "enabled": True,
         }
     ]
-    
+
     # Risk management settings
     VOLATILITY_LOOKBACK: int = 20
     VOLATILITY_THRESHOLD: float = 0.4
     CORRELATION_LOOKBACK: int = 60
-    
+
     # Market analysis settings
     RSI_PERIOD: int = 14
     MOVING_AVERAGE_PERIOD: int = 50
     MARKET_VOLATILITY_LOOKBACK: int = 20
-    
+
     # Legacy single-stock settings (for backward compatibility)
-    TICKER: str = "AVGO"
+    TICKER: str = "AAPL"  # Updated to AAPL
     TARGET_DELTA_MIN: float = 0.25
     TARGET_DELTA_MAX: float = 0.75
     MAX_POSITION_SIZE: float = 0.20
@@ -56,136 +135,74 @@ class StrategyConfig:
     END_DATE: str = "2025-01-01"
     CASH: int = TOTAL_CASH
 
+
 class ConfigLoader:
     """
-    Handles loading and applying configuration settings.
+    Handles loading configuration settings from file or embedded defaults.
     This class separates the strategy's parameters from its core logic, allowing
     for easy tuning without modifying the Python code.
     """
-    def __init__(self, algorithm: Any) -> None:
-        """
-        Initializes the ConfigLoader.
-        
-        Args:
-            algorithm: A reference to the main algorithm instance. This allows the
-                       loader to set attributes on the algorithm object.
-        """
-        self.algorithm: Any = algorithm
 
-    def load_config(self, config_file: str = 'config.json') -> None:
+    @staticmethod
+    def load_config(config_file: str = "config.json") -> Config:
         """
         Loads configuration from embedded settings or tries to load from file.
         Falls back to embedded configuration if file loading fails.
-        
+
         Args:
             config_file: The path to the JSON configuration file (optional).
+
+        Returns:
+            Config: The loaded configuration object.
         """
-        # Embedded configuration using StrategyConfig class
-        embedded_config: Dict[str, Dict[str, Any]] = {
-            "parameters": {
-                "portfolio": {
-                    "total_cash": StrategyConfig.TOTAL_CASH,
-                    "max_stocks": StrategyConfig.MAX_STOCKS,
-                    "max_portfolio_risk": StrategyConfig.MAX_PORTFOLIO_RISK,
-                    "max_drawdown": StrategyConfig.MAX_DRAWDOWN,
-                    "correlation_threshold": StrategyConfig.CORRELATION_THRESHOLD
-                },
-                "stocks": StrategyConfig.STOCKS,
-                "risk_management": {
-                    "max_portfolio_risk": StrategyConfig.MAX_PORTFOLIO_RISK,
-                    "max_drawdown": StrategyConfig.MAX_DRAWDOWN,
-                    "volatility_lookback": StrategyConfig.VOLATILITY_LOOKBACK,
-                    "volatility_threshold": StrategyConfig.VOLATILITY_THRESHOLD,
-                    "correlation_lookback": StrategyConfig.CORRELATION_LOOKBACK
-                },
-                "market_analysis": {
-                    "rsi_period": StrategyConfig.RSI_PERIOD,
-                    "moving_average_period": StrategyConfig.MOVING_AVERAGE_PERIOD,
-                    "volatility_lookback": StrategyConfig.MARKET_VOLATILITY_LOOKBACK
-                }
-            }
-        }
-        
-        # Try to load from file first
+        # Try to load from file
         try:
-            with open(config_file, 'r') as f:
-                config: Dict[str, Any] = json.load(f)
-                self.algorithm.Log(f"Successfully loaded configuration from {config_file}")
-        except FileNotFoundError:
-            # Try with config directory path
-            try:
-                import os
-                config_dir_path: str = os.path.join('config', config_file)
-                with open(config_dir_path, 'r') as f:
-                    config = json.load(f)
-                self.algorithm.Log(f"Successfully loaded configuration from config directory: {config_dir_path}")
-            except FileNotFoundError:
-                # Try with absolute path from current file location
-                try:
-                    current_dir: str = os.path.dirname(os.path.abspath(__file__))
-                    absolute_config_path: str = os.path.join(current_dir, config_file)
-                    with open(absolute_config_path, 'r') as f:
-                        config = json.load(f)
-                    self.algorithm.Log(f"Successfully loaded configuration from absolute path: {absolute_config_path}")
-                except (FileNotFoundError, json.JSONDecodeError) as e:
-                    self.algorithm.Log(f"Could not load config file: {e}. Using embedded configuration.")
-                    config = embedded_config
-            except json.JSONDecodeError as e:
-                self.algorithm.Log(f"JSON parsing error in config file: {e}. Using embedded configuration.")
-                config = embedded_config
-        except json.JSONDecodeError as e:
-            self.algorithm.Log(f"JSON parsing error in config file: {e}. Using embedded configuration.")
-            config = embedded_config
-        
-        # Get the nested 'parameters' dictionary from the config file.
-        parameters: Dict[str, Any] = config.get('parameters', {})
-        
-        # Store the entire parameters dictionary for access by the strategy
-        self.algorithm.parameters = parameters
-        
-        # --- Apply each parameter to the algorithm ---
-        # For each parameter, we use .get() to provide a default value in case
-        # the parameter is not defined in the JSON file.
-        
-        # Handle multi-stock configuration
-        stocks_config = parameters.get('stocks', [])
-        if stocks_config:
-            # Use first stock as default for backward compatibility
-            first_stock = stocks_config[0]
-            self.algorithm.ticker = first_stock.get('ticker', StrategyConfig.TICKER)
-            self.algorithm.target_delta_min = first_stock.get('target_delta_min', StrategyConfig.TARGET_DELTA_MIN)
-            self.algorithm.target_delta_max = first_stock.get('target_delta_max', StrategyConfig.TARGET_DELTA_MAX)
-            self.algorithm.max_position_size = first_stock.get('max_position_size', StrategyConfig.MAX_POSITION_SIZE)
-            self.algorithm.option_frequency = first_stock.get('option_frequency', StrategyConfig.OPTION_FREQUENCY)
-        else:
-            # Fallback to single-stock configuration
-            self.algorithm.ticker = parameters.get('ticker', StrategyConfig.TICKER)
-            self.algorithm.target_delta_min = parameters.get('target_delta_min', StrategyConfig.TARGET_DELTA_MIN)
-            self.algorithm.target_delta_max = parameters.get('target_delta_max', StrategyConfig.TARGET_DELTA_MAX)
-            self.algorithm.max_position_size = parameters.get('max_position_size', StrategyConfig.MAX_POSITION_SIZE)
-            self.algorithm.option_frequency = parameters.get('option_frequency', StrategyConfig.OPTION_FREQUENCY)
-        
-        # Set the initial cash for the backtest.
-        portfolio_config = parameters.get('portfolio', {})
-        self.algorithm.SetCash(portfolio_config.get('total_cash', StrategyConfig.CASH))
-        
-        # Load risk management configuration
-        risk_config: Dict[str, Any] = parameters.get('risk_management', {})
-        self.algorithm.max_portfolio_risk = risk_config.get('max_portfolio_risk', 0.02)
-        self.algorithm.max_drawdown = risk_config.get('max_drawdown', 0.15)
-        self.algorithm.volatility_lookback = risk_config.get('volatility_lookback', 20)
-        self.algorithm.volatility_threshold = risk_config.get('volatility_threshold', 0.4)
-        
-        # Load market analysis configuration
-        market_config: Dict[str, Any] = parameters.get('market_analysis', {})
-        self.algorithm.rsi_period = market_config.get('rsi_period', 14)
-        self.algorithm.moving_average_period = market_config.get('moving_average_period', 50)
-        self.algorithm.market_volatility_lookback = market_config.get('volatility_lookback', 20)
-        
+            # Handle file path correctly for Lean environment
+            # If config_file is a relative path, try to find it relative to the project root
+            config_path = config_file
+
+            # If the file doesn't exist in current directory, try to find it in the project root
+            if not os.path.exists(config_path):
+                # Get the directory of this file (config/common_config_loader.py)
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                # Go up one level to project root
+                project_root = os.path.dirname(current_dir)
+                # Try the config file in project root
+                config_path = os.path.join(project_root, config_file)
+
+                # If still not found, try in config directory
+                if not os.path.exists(config_path):
+                    config_path = os.path.join(project_root, "config", config_file)
+
+            with open(config_path, "r") as f:
+                file_config = json.load(f)
+                logging.info(f"Successfully loaded configuration from {config_path}")
+                # Create config from file
+                config = Config.from_dict(file_config)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            logging.warning(
+                f"Error loading config file {config_file}: {e}. Using embedded configuration."
+            )
+            # Create default config
+            config = Config()
+
+        # Log the loaded config for debugging
+        logging.info(f"Loaded Config: {config}")
+
         # Log the configuration being used
-        if stocks_config:
-            stock_count = len(stocks_config)
-            tickers = [stock.get('ticker', 'Unknown') for stock in stocks_config if stock.get('enabled', True)]
-            self.algorithm.Log(f"Configuration loaded - {stock_count} stock(s): {', '.join(tickers)}, Delta Range: {self.algorithm.target_delta_min}-{self.algorithm.target_delta_max}, Position Size: {self.algorithm.max_position_size}")
+        if config.stocks:
+            stock_count = len(config.stocks)
+            tickers = [
+                stock.get("ticker", "Unknown")
+                for stock in config.stocks
+                if stock.get("enabled", True)
+            ]
+            logging.info(
+                f"Configuration loaded - {stock_count} stock(s): {', '.join(tickers)}, Delta Range: {config.target_delta_min}-{config.target_delta_max}, Position Size: {config.max_position_size}"
+            )
         else:
-            self.algorithm.Log(f"Configuration loaded - Ticker: {self.algorithm.ticker}, Delta Range: {self.algorithm.target_delta_min}-{self.algorithm.target_delta_max}, Position Size: {self.algorithm.max_position_size}")
+            logging.info(
+                f"Configuration loaded - Ticker: {config.ticker}, Delta Range: {config.target_delta_min}-{config.target_delta_max}, Position Size: {config.max_position_size}"
+            )
+
+        return config

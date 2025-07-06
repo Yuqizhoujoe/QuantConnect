@@ -1,0 +1,12 @@
+[importlinter]
+root_package = quantconnet
+
+[contracts]
+circular_imports = circular_imports
+
+[contracts.circular_imports]
+name = Circular imports
+type = forbidden
+ignore_modules = 
+    AlgorithmImports
+    AlgorithmImports.* 

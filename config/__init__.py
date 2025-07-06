@@ -7,4 +7,4 @@ trading strategies and common settings.
 
 from .common_config_loader import ConfigLoader
 
-__all__ = ['ConfigLoader'] 
+__all__ = ["ConfigLoader"]

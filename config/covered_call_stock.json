@@ -1,0 +1,32 @@
+{
+    "strategy_name": "Covered Call Strategy",
+    "description": "Sells covered call options on stocks we own",
+    "portfolio": {
+        "max_portfolio_allocation": 0.95,
+        "max_stock_allocation": 0.20,
+        "max_option_allocation": 0.10,
+        "risk_tolerance": "moderate"
+    },
+    "stocks": [
+        {
+            "ticker": "AAPL",
+            "enabled": true,
+            "allocation": 0.15,
+            "min_days_to_expiration": 14,
+            "max_days_to_expiration": 45,
+            "strike_offset": 1,
+            "max_contracts": 2
+        }
+    ],
+    "options": {
+        "min_days_to_expiration": 14,
+        "max_days_to_expiration": 45,
+        "strike_selection": "above_current_price",
+        "strike_offset": 1
+    },
+    "risk_management": {
+        "max_loss_per_trade": 0.05,
+        "stop_loss_percentage": 0.10,
+        "profit_taking_percentage": 0.50
+    }
+}
