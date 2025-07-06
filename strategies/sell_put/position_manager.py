@@ -137,8 +137,8 @@ class PositionManager:
         
         The strategy adapts to market conditions rather than using fixed parameters.
         """
-        # Step 1: Validate data availability - use current slice from algorithm
-        slice_data: Any = self.algorithm.CurrentSlice
+        # Step 1: Validate data availability - use latest slice from data handler
+        slice_data: Any = self.data_handler.latest_slice
         if not slice_data:
             self.algorithm.Debug(f"No current slice data available for {self.ticker}")
             return
