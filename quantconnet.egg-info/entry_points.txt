@@ -1,0 +1,2 @@
+[console_scripts]
+quantconnet = cli.run_strategy:main

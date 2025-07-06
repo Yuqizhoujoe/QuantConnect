@@ -5,6 +5,9 @@ from typing import Dict, List, Optional, Any, Tuple, Union
 from core.risk_manager import RiskManager
 from core.market_analyzer import MarketAnalyzer
 
+# Ensure OptionRight is available
+from AlgorithmImports import OptionRight
+
 class PositionManager:
     """
     Enhanced position manager with advanced risk management and market analysis.

@@ -2,6 +2,7 @@
 # region imports
 from AlgorithmImports import *
 from typing import Dict, List, Any
+from datetime import timedelta
 from .portfolio_manager import PortfolioManager
 from config.common_config_loader import ConfigLoader
 from core.scheduler import Scheduler
@@ -28,6 +29,9 @@ class ConfigurableShortPutStrategy(QCAlgorithm):
         Initializes the algorithm, loads configuration, and sets up all components.
         This method is called once at the very beginning of the algorithm's lifecycle.
         """
+        # Initialize parameters attribute
+        self.parameters = {}
+        
         # Create the configuration loader and load parameters from config file
         self.config_loader: ConfigLoader = ConfigLoader(self)
         self.config_loader.load_config('sell_put_multi_stock.json')
@@ -67,10 +71,6 @@ class ConfigurableShortPutStrategy(QCAlgorithm):
         # --- Initialize Helper Modules ---
         self.scheduler: Scheduler = Scheduler(self, self.portfolio_manager)
         self.evaluator: Evaluator = Evaluator(self)
-        
-        # Initialize risk manager for the main strategy
-        from core.risk_manager import RiskManager
-        self.risk_manager: RiskManager = RiskManager(self, "MAIN")
 
         # Set up the scheduled event to evaluate the strategy logic periodically
         self.scheduler.setup_events()

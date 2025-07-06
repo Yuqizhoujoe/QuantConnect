@@ -1,0 +1,434 @@
+Metadata-Version: 2.4
+Name: quantconnet
+Version: 0.1.0
+Summary: A modular trading strategy framework for QuantConnect
+Author-email: QuantConnect Developer <developer@quantconnect.com>
+License: MIT
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Financial and Insurance Industry
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Office/Business :: Financial :: Investment
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.21.0
+Requires-Dist: pandas>=1.3.0
+Requires-Dist: scipy>=1.7.0
+Provides-Extra: dev
+Requires-Dist: pytest>=6.0; extra == "dev"
+Requires-Dist: pytest-cov>=2.0; extra == "dev"
+Requires-Dist: black>=21.0; extra == "dev"
+Requires-Dist: flake8>=3.8; extra == "dev"
+Requires-Dist: mypy>=0.910; extra == "dev"
+Requires-Dist: pre-commit>=2.15; extra == "dev"
+
+# QuantConnect Trading Strategy Framework
+
+A modular, production-ready trading strategy framework for QuantConnect that supports multiple strategies with shared core components.
+
+## 🏗️ Architecture
+
+The project follows a strategy-centric architecture with the following structure:
+
+```
+quantconnet/
+├── README.md
+├── COMPREHENSIVE_GUIDE.md
+├── pyproject.toml
+├── config/                           # Configuration files
+│   ├── sell_put_multi_stock.json     # Unified config (single or multi-stock)
+│   ├── sell_put_multi_stock_example.json  # Multi-stock example
+│   ├── __init__.py
+│   └── common_config_loader.py
+├── core/                            # Shared across all strategies
+│   ├── __init__.py
+│   ├── data_handler.py
+│   ├── market_analyzer.py
+│   ├── risk_manager.py
+│   ├── correlation_manager.py
+│   └── scheduler.py
+├── strategies/
+│   ├── __init__.py
+│   ├── sell_put/                    # Sell Put Strategy
+│   │   ├── __init__.py
+│   │   ├── main.py                  # Unified strategy (single or multi-stock)
+│   │   ├── portfolio_manager.py
+│   │   ├── position_manager.py
+│   │   ├── stock_manager.py
+│   │   ├── trade_executor.py
+│   │   └── evaluator.py
+│   └── covered_call/                # Future: Covered Call Strategy
+│       └── __init__.py
+├── cli/
+│   └── run_strategy.py              # Entrypoint to run strategies via CLI
+├── tests/
+│   ├── __init__.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   └── test_data_handler.py
+│   ├── sell_put/
+│   │   ├── __init__.py
+│   │   └── test_portfolio_manager.py
+│   └── covered_call/
+│       └── __init__.py
+├── research/
+│   └── research.ipynb
+├── data/                            # Data storage
+├── storage/                         # Strategy storage
+├── backup/                          # Backup files
+└── sell put option/                 # Legacy directory
+    └── backtests/
+```
+
+## 🚀 Features
+
+### Core Components (Shared)
+
+- **Data Handler**: Efficient data processing with smart plotting
+- **Market Analyzer**: Technical analysis and market regime detection
+- **Risk Manager**: Position sizing and risk controls
+- **Correlation Manager**: Portfolio diversification
+- **Scheduler**: Event-driven trading execution
+
+### Sell Put Strategy
+
+- **Single Stock Mode**: Basic short put strategy for one stock
+- **Multi-Stock Mode**: Advanced portfolio management across multiple stocks
+- Dynamic parameter adjustment based on market conditions
+- Advanced option selection with multiple criteria
+- Comprehensive risk management
+- Performance tracking and evaluation
+
+### Benefits
+
+- **Modular**: Each strategy has isolated components
+- **Scalable**: Easy to add new strategies
+- **Production-ready**: Clean, logical structure
+- **Type-safe**: Comprehensive type hints throughout
+- **Configurable**: JSON-based configuration system
+
+## 📦 Installation
+
+### Prerequisites
+
+- Python 3.8 or higher
+- [uv](https://github.com/astral-sh/uv) package manager
+
+### Setup with uv
+
+1. Clone the repository:
+
+```bash
+git clone <repository-url>
+cd quantconnet
+```
+
+2. Install uv (if not already installed):
+
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+3. Create and activate virtual environment:
+
+```bash
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+4. Install the package:
+
+```bash
+uv pip install -e .
+```
+
+5. Install development dependencies (optional):
+
+```bash
+uv pip install -e ".[dev]"
+```
+
+### Alternative: Using uv sync
+
+For a more streamlined setup:
+
+```bash
+# Install dependencies and create virtual environment
+uv sync
+
+# Activate virtual environment
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+## 🎯 Usage
+
+### Command Line Interface
+
+Run strategies using the CLI:
+
+```bash
+# Run sell put strategy with default config (single stock)
+python cli/run_strategy.py sell-put
+
+# Run with multi-stock config
+python cli/run_strategy.py sell-put --config config/sell_put_multi_stock_example.json
+
+# List available configurations
+python cli/run_strategy.py --list-configs
+
+# Run in live mode (future)
+python cli/run_strategy.py sell-put --live
+```
+
+### QuantConnect Integration
+
+For QuantConnect backtesting, use the unified strategy class:
+
+```python
+# Unified strategy (works for single or multi-stock)
+from strategies.sell_put import SellPutOption
+```
+
+## ⚙️ Configuration
+
+### Strategy Configuration
+
+The strategy uses a unified configuration approach. For single stock, just add one stock to the list. For multiple stocks, add multiple stocks.
+
+#### Single Stock Configuration (`config/sell_put_multi_stock.json`)
+
+```json
+{
+  "parameters": {
+    "portfolio": {
+      "total_cash": 100000,
+      "max_stocks": 5,
+      "max_portfolio_risk": 0.02,
+      "max_drawdown": 0.15
+    },
+    "stocks": [
+      {
+        "ticker": "AVGO",
+        "weight": 1.0,
+        "target_delta_min": 0.25,
+        "target_delta_max": 0.75,
+        "max_position_size": 0.2,
+        "option_frequency": "monthly",
+        "enabled": true
+      }
+    ]
+  }
+}
+```
+
+#### Multi-Stock Configuration (`config/sell_put_multi_stock_example.json`)
+
+```json
+{
+  "parameters": {
+    "portfolio": {
+      "max_stocks": 5,
+      "max_portfolio_risk": 0.02,
+      "max_drawdown": 0.15
+    },
+    "stocks": [
+      {
+        "ticker": "AVGO",
+        "enabled": true,
+        "target_delta_min": 0.25,
+        "target_delta_max": 0.75,
+        "max_position_size": 0.2,
+        "option_frequency": "monthly",
+        "weight": 0.5
+      },
+      {
+        "ticker": "AAPL",
+        "enabled": true,
+        "target_delta_min": 0.2,
+        "target_delta_max": 0.6,
+        "max_position_size": 0.15,
+        "option_frequency": "monthly",
+        "weight": 0.5
+      }
+    ]
+  }
+}
+```
+
+### Core Configuration
+
+Core components can be configured through the strategy config:
+
+```json
+{
+  "parameters": {
+    "risk_management": {
+      "max_portfolio_risk": 0.02,
+      "max_drawdown": 0.15,
+      "volatility_lookback": 20
+    },
+    "market_analysis": {
+      "rsi_period": 14,
+      "moving_average_period": 50
+    },
+    "plotting": {
+      "enabled": true,
+      "plot_frequency": 50,
+      "max_plot_points": 3500
+    }
+  }
+}
+```
+
+## 🧪 Testing
+
+Run the test suite:
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run with coverage
+uv run pytest --cov=core --cov=strategies
+
+# Run specific test categories
+uv run pytest tests/core/
+uv run pytest tests/sell_put/
+```
+
+## 📊 Strategy Performance
+
+The Sell Put strategy includes:
+
+- **Dynamic Parameter Adjustment**: Adapts to market conditions
+- **Advanced Option Selection**: Multi-criteria contract selection
+- **Risk Management**: Position sizing and portfolio-level controls
+- **Performance Tracking**: Comprehensive metrics and evaluation
+
+## 🔧 Development
+
+### Adding a New Strategy
+
+1. Create a new directory in `strategies/`:
+
+```bash
+mkdir strategies/new_strategy
+```
+
+2. Create the required files:
+
+```python
+# strategies/new_strategy/__init__.py
+from .main import NewStrategy
+
+__all__ = ['NewStrategy']
+
+# strategies/new_strategy/main.py
+from AlgorithmImports import *
+from core.data_handler import DataHandler
+from core.risk_manager import RiskManager
+
+class NewStrategy(QCAlgorithm):
+    def Initialize(self):
+        # Strategy initialization
+        pass
+
+    def OnData(self, slice):
+        # Strategy logic
+        pass
+```
+
+3. Add configuration file:
+
+```bash
+# config/new_strategy.json
+{
+  "parameters": {
+    "ticker": "SPY",
+    "strategy_specific_param": 0.5
+  }
+}
+```
+
+4. Update CLI to support the new strategy
+
+### Code Quality
+
+The project uses several tools for code quality:
+
+- **Type Hints**: Comprehensive typing throughout
+- **Black**: Code formatting
+- **Flake8**: Linting
+- **MyPy**: Type checking
+- **Pytest**: Testing
+
+Run quality checks:
+
+```bash
+# Format code
+uv run black .
+
+# Lint code
+uv run flake8 .
+
+# Type check
+uv run mypy .
+
+# Run all checks
+uv run pre-commit run --all-files
+```
+
+### Dependency Management
+
+Add new dependencies:
+
+```bash
+# Add runtime dependency
+uv add package-name
+
+# Add development dependency
+uv add --dev package-name
+
+# Update dependencies
+uv sync
+```
+
+## 📚 Documentation
+
+- **COMPREHENSIVE_GUIDE.md**: Detailed strategy documentation
+- **research/research.ipynb**: Strategy research and analysis
+- **Code Comments**: Comprehensive inline documentation
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Run the test suite
+6. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## ⚠️ Disclaimer
+
+This software is for educational and research purposes only. It is not intended to provide financial advice. Trading options involves substantial risk and is not suitable for all investors.
+
+## 🆘 Support
+
+For questions and support:
+
+- Check the documentation
+- Review the code comments
+- Open an issue on GitHub

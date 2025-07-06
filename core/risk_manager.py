@@ -201,7 +201,7 @@ class RiskManager:
             
         # Calculate volatility from recent PnL data
         recent_pnl: List[float] = all_daily_pnl[-self.volatility_lookback:]
-        volatility: float = np.std(recent_pnl)
+        volatility: float = float(np.std(recent_pnl))
         
         # Adjust position size based on volatility regime
         if volatility > self.volatility_threshold:
@@ -251,7 +251,7 @@ class RiskManager:
         completed_trades = [t for t in all_trades if 'pnl' in t and t['pnl'] > 0]
         if not completed_trades:
             return 100  # Default assumption
-        return np.mean([t['pnl'] for t in completed_trades])
+        return float(np.mean([t['pnl'] for t in completed_trades]))
     
     def get_average_loss(self) -> float:
         """
@@ -270,7 +270,7 @@ class RiskManager:
         completed_trades = [t for t in all_trades if 'pnl' in t and t['pnl'] < 0]
         if not completed_trades:
             return 200  # Default assumption
-        return abs(np.mean([t['pnl'] for t in completed_trades]))
+        return abs(float(np.mean([t['pnl'] for t in completed_trades])))
     
     def should_stop_trading(self):
         """
