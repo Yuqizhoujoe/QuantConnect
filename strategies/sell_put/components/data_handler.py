@@ -1,10 +1,9 @@
-# type: ignore
-from AlgorithmImports import *
+from AlgorithmImports import *   # type: ignore
 from typing import Any, Optional, TYPE_CHECKING
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
-    from .sell_put_strategy import SellPutOptionStrategy
+    from ..sell_put_strategy import SellPutOptionStrategy
 
 
 @dataclass
@@ -54,7 +53,7 @@ class DataHandler:
                     f"{self.ticker} data updated - no option chains in slice"
                 )
 
-    def on_data(self, slice: Slice) -> None:
+    def on_data(self, slice: Slice) -> None:  # type: ignore
         """
         Simplified data handling for cloud backtesting.
 

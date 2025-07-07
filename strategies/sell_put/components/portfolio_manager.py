@@ -5,19 +5,22 @@ from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, field
 from .stock_manager import StockManager
 from shared.utils.position_utils import RiskLimits
+from shared.utils.trading_criteria import (
+    CriteriaManager,
+    CriteriaPresets,
+    DeltaCriterion,
+    MarketRegimeCriterion,
+    VolatilityCriterion,
+    DTECriterion,
+    RSICriterion,
+    TrendCriterion,
+)
 from shared.utils.constants import (
     MAX_PNL_HISTORY_LENGTH,
-    VOLATILITY_LOW_THRESHOLD,
-    VOLATILITY_HIGH_THRESHOLD,
-    MARKET_SCORE_BULLISH_LOW_VOL,
-    MARKET_SCORE_BULLISH_NORMAL_VOL,
-    MARKET_SCORE_BEARISH_HIGH_VOL,
-    VOLATILITY_SCORE_LOW,
-    VOLATILITY_SCORE_HIGH,
 )
 
 if TYPE_CHECKING:
-    from .sell_put_strategy import SellPutOptionStrategy
+    from ..sell_put_strategy import SellPutOptionStrategy
 
 
 @dataclass
@@ -36,7 +39,7 @@ class PortfolioManager:
 
     def initialize_stocks(self, stocks_config: List[dict]) -> None:
         """
-        Initialize StockManager instances for each configured stock.
+        Initialize StockManager instances for each configured stock and set up criteria managers.
 
         Args:
             stocks_config: List of stock configuration dictionaries
@@ -44,10 +47,114 @@ class PortfolioManager:
         for stock_config in stocks_config:
             ticker = stock_config["ticker"]
             if stock_config.get("enabled", True):
-                self.stock_managers[ticker] = StockManager(
+                # Create stock manager
+                stock_manager = StockManager(
                     strategy=self.strategy, ticker=ticker, config=stock_config
                 )
+                self.stock_managers[ticker] = stock_manager
+                
+                # Set up criteria manager for this stock
+                self._setup_criteria_manager(stock_manager, stock_config)
+                
                 self.strategy.Log(f"Initialized StockManager for {ticker}")
+
+    def _setup_criteria_manager(self, stock_manager: StockManager, stock_config: dict) -> None:
+        """
+        Set up criteria manager for a stock based on its configuration.
+        
+        Args:
+            stock_manager: StockManager instance
+            stock_config: Stock-specific configuration dictionary
+        """
+        ticker = stock_manager.ticker
+        
+        # Get criteria configuration from stock config
+        criteria_config = stock_config.get("criteria", {})
+        criteria_type = criteria_config.get("type", "delta_only")
+        
+        self.strategy.Log(f"{ticker}: Setting up criteria manager of type: {criteria_type}")
+        
+        # Create criteria manager based on configuration
+        criteria_manager = self._create_criteria_manager(criteria_config)
+        
+        # Set the criteria manager for this stock's position manager's market analyzer
+        if stock_manager.position_manager and stock_manager.position_manager.market_analyzer:
+            stock_manager.position_manager.market_analyzer.set_criteria(criteria_manager)
+            self.strategy.Log(f"{ticker}: Criteria manager configured")
+        else:
+            self.strategy.Log(f"{ticker}: Warning - No market analyzer available")
+
+    def _create_criteria_manager(self, criteria_config: dict) -> CriteriaManager:
+        """
+        Create a criteria manager based on criteria configuration.
+        
+        Args:
+            criteria_config: Criteria configuration dictionary
+            
+        Returns:
+            Configured CriteriaManager instance
+        """
+        criteria_type = criteria_config.get("type", "delta_only")
+        
+        if criteria_type == "delta_only":
+            # Use delta-only preset
+            manager = CriteriaPresets.delta_only()
+            
+        elif criteria_type == "custom":
+            # Create custom criteria manager
+            manager = CriteriaManager()
+            
+            # Add delta criterion
+            delta_config = criteria_config.get("delta", {})
+            delta_range = delta_config.get("range", (0.25, 0.75))
+            delta_weight = delta_config.get("weight", 1.0)
+            manager.add_criterion(DeltaCriterion(target_range=delta_range, weight=delta_weight))
+            
+            # Add volatility criterion if specified
+            vol_config = criteria_config.get("volatility", {})
+            if vol_config.get("enabled", False):
+                max_vol = vol_config.get("max_volatility", 0.5)
+                vol_weight = vol_config.get("weight", 0.7)
+                manager.add_criterion(VolatilityCriterion(max_volatility=max_vol, weight=vol_weight))
+            
+            # Add market regime criterion if specified
+            regime_config = criteria_config.get("market_regime", {})
+            if regime_config.get("enabled", False):
+                allowed_regimes = regime_config.get("allowed_regimes", ["bullish_low_vol", "neutral_normal_vol"])
+                regime_weight = regime_config.get("weight", 0.8)
+                manager.add_criterion(MarketRegimeCriterion(allowed_regimes=allowed_regimes, weight=regime_weight))
+            
+            # Add DTE criterion if specified
+            dte_config = criteria_config.get("dte", {})
+            if dte_config.get("enabled", False):
+                dte_range = dte_config.get("range", (14, 45))
+                dte_weight = dte_config.get("weight", 0.6)
+                manager.add_criterion(DTECriterion(min_dte=dte_range[0], max_dte=dte_range[1], weight=dte_weight))
+            
+            # Add RSI criterion if specified
+            rsi_config = criteria_config.get("rsi", {})
+            if rsi_config.get("enabled", False):
+                oversold = rsi_config.get("oversold", 30)
+                overbought = rsi_config.get("overbought", 70)
+                rsi_weight = rsi_config.get("weight", 0.8)
+                manager.add_criterion(RSICriterion(oversold=oversold, overbought=overbought, weight=rsi_weight))
+            
+            # Add trend criterion if specified
+            trend_config = criteria_config.get("trend", {})
+            if trend_config.get("enabled", False):
+                allowed_directions = trend_config.get("allowed_directions", ["bullish", "neutral"])
+                trend_weight = trend_config.get("weight", 0.7)
+                manager.add_criterion(TrendCriterion(allowed_directions=allowed_directions, weight=trend_weight))
+        
+        else:
+            # Default to delta-only if unknown type
+            self.strategy.Log(f"Unknown criteria type '{criteria_type}', using delta_only")
+            manager = CriteriaPresets.delta_only()
+        
+        # Log the criteria configuration
+        self.strategy.Log(f"Criteria manager created: {manager.get_criteria_summary()}")
+        
+        return manager
 
     def update_portfolio_data(self, slice_data) -> None:
         """
@@ -221,7 +328,7 @@ class PortfolioManager:
 
     def _calculate_opportunity_score(self, stock_manager: StockManager) -> float:
         """
-        Calculate a score for trading opportunity quality.
+        Simplified opportunity scoring focused on delta availability.
 
         Args:
             stock_manager: StockManager instance to evaluate
@@ -234,31 +341,17 @@ class PortfolioManager:
         # Base score from weight
         score += stock_manager.weight * 10
 
-        # Market condition bonus
-        market_analysis = stock_manager.market_analyzer.analyze_market_conditions(
-            stock_manager.price_history[-1] if stock_manager.price_history else 0
-        )
+        # Check if we have price data (indicates delta availability)
+        if stock_manager.price_history:
+            score += 5.0  # Bonus for having price data
 
-        if market_analysis.market_regime.value == "bullish_low_vol":
-            score += MARKET_SCORE_BULLISH_LOW_VOL
-        elif market_analysis.market_regime.value == "bullish_normal_vol":
-            score += MARKET_SCORE_BULLISH_NORMAL_VOL
-        elif market_analysis.market_regime.value == "bearish_high_vol":
-            score += MARKET_SCORE_BEARISH_HIGH_VOL
+        # Check if we have recent data (within last few days)
+        if len(stock_manager.price_history) >= 5:
+            score += 3.0  # Bonus for sufficient data history
 
-        # Volatility bonus (prefer lower volatility)
-        volatility = market_analysis.volatility.current
-        if volatility < VOLATILITY_LOW_THRESHOLD:
-            score += VOLATILITY_SCORE_LOW
-        elif volatility > VOLATILITY_HIGH_THRESHOLD:
-            score += VOLATILITY_SCORE_HIGH
-
-        # Correlation penalty (simplified - correlation not critical)
-        # correlation = self.correlation_manager.get_stock_correlation(stock_manager.ticker)  # Disabled
-        # if correlation > 0.8:
-        #     score -= 5
-        # elif correlation < 0.3:
-        #     score += 3
+        # Simple check for data quality
+        if stock_manager.data_handler and stock_manager.data_handler.latest_slice:
+            score += 2.0  # Bonus for having current market data
 
         return score
 

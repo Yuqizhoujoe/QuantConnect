@@ -1,29 +1,41 @@
 from AlgorithmImports import *  # type: ignore
-import numpy as np
-from typing import List, Tuple, TYPE_CHECKING
+from typing import Dict, List, Any, Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, field
+import numpy as np
 from shared.utils.market_analysis_types import (
     MarketAnalysis,
     MarketRegime,
-    VolatilityData,
     TrendData,
+    VolatilityData,
     SupportResistanceData,
+)
+from shared.utils.trading_criteria import (
+    CriteriaManager,
+    CriteriaPresets,
+    DeltaCriterion,
+    MarketRegimeCriterion,
+    VolatilityCriterion,
+    DTECriterion,
+    RSICriterion,
+    TrendCriterion,
+    TradingContext,
 )
 
 if TYPE_CHECKING:
-    from .sell_put_strategy import SellPutOptionStrategy
+    from ..sell_put_strategy import SellPutOptionStrategy
 
 
 @dataclass
 class MarketAnalyzer:
     """
-    Market analysis for option trading decisions.
+    Market analysis for option trading decisions using modular criteria system.
 
     Provides essential market analysis including:
     - Trend analysis using moving averages
     - Volatility analysis
     - Market regime detection
     - Dynamic parameter adjustment
+    - Modular criteria evaluation
     """
 
     strategy: "SellPutOptionStrategy"
@@ -38,24 +50,47 @@ class MarketAnalyzer:
     price_history: List[float] = field(default_factory=list)
     volatility_history: List[float] = field(default_factory=list)
 
+    # Criteria manager
+    criteria_manager: Optional[CriteriaManager] = field(default=None, init=False)
+
+    def __post_init__(self):
+        """Initialize the criteria manager with default criteria."""
+        # Start with delta-only criteria (can be customized later)
+        self.criteria_manager = CriteriaPresets.delta_only()
+
+    def set_criteria(self, criteria_manager: CriteriaManager) -> None:
+        """Set custom criteria for this analyzer."""
+        self.criteria_manager = criteria_manager
+        self.strategy.Log(f"{self.ticker}: Updated criteria: {criteria_manager.get_criteria_summary()}")
+
     def analyze_market_conditions(self, underlying_price: float) -> MarketAnalysis:
-        """Main market analysis function."""
+        """
+        Market analysis using modular criteria system.
+        
+        Evaluates all criteria and determines if trading should proceed.
+        """
         self.update_price_history(underlying_price)
 
-        if len(self.price_history) < self.moving_average_period:
-            self.strategy.Log(
-                f"{self.ticker} insufficient data - using default analysis"
-            )
-            return self._get_default_analysis()
-
+        # Perform market analysis
         trend_data = self._analyze_trend()
         volatility_data = self._analyze_volatility()
         support_resistance_data = self._analyze_support_resistance()
         market_regime = self._determine_market_regime(trend_data, volatility_data)
-
         rsi = self._calculate_rsi()
-        risk_score = self._calculate_risk_score(trend_data, volatility_data)
-        should_trade = self._should_trade(volatility_data, market_regime)
+
+        # Create context for criteria evaluation
+        context = self._create_evaluation_context(
+            underlying_price, trend_data, volatility_data, 
+            market_regime, rsi
+        )
+
+        # Evaluate criteria
+        if self.criteria_manager:
+            should_trade, score, message = self.criteria_manager.should_trade(context)
+        else:
+            should_trade, score, message = True, 1.0, "No criteria manager - allowing trade"
+        
+        self.strategy.Log(f"{self.ticker}: Criteria evaluation - {message}")
 
         return MarketAnalysis(
             market_regime=market_regime,
@@ -64,58 +99,55 @@ class MarketAnalyzer:
             volatility=volatility_data,
             support_resistance=support_resistance_data,
             rsi=rsi,
-            risk_score=risk_score,
-            confidence_score=(
-                0.9 if len(self.price_history) >= self.moving_average_period else 0.3
-            ),
+            risk_score=1.0 - score,  # Invert score for risk (lower is better)
+            confidence_score=score,
             should_trade=should_trade,
-            recommended_delta_range=self.get_optimal_delta_range(
-                market_regime, volatility_data
-            ),
+            recommended_delta_range=self.get_optimal_delta_range(market_regime, volatility_data),
             recommended_dte_range=self.get_optimal_dte_range(volatility_data),
             analysis_timestamp=str(self.strategy.Time),
-            data_quality_score=(
-                1.0 if len(self.price_history) >= self.moving_average_period else 0.3
-            ),
+            data_quality_score=score,
+        )
+
+    def _create_evaluation_context(
+        self, 
+        underlying_price: float,
+        trend_data: TrendData,
+        volatility_data: VolatilityData,
+        market_regime: MarketRegime,
+        rsi: float
+    ) -> TradingContext:
+        """Create TradingContext for criteria evaluation."""
+        return TradingContext(
+            underlying_price=underlying_price,
+            trend_direction=trend_data.direction,
+            trend_strength=trend_data.strength,
+            volatility=volatility_data.current,
+            market_regime=market_regime.value,
+            rsi=rsi,
+            dte=30,  # Default DTE - will be updated by position manager
+            delta=0.5,  # Default delta - will be updated by position manager
+            timestamp=str(self.strategy.Time),
         )
 
     def get_optimal_delta_range(
         self, market_regime: MarketRegime, volatility_data: VolatilityData
     ) -> Tuple[float, float]:
-        """Get optimal delta range based on market conditions."""
-        base_min, base_max = 0.25, 0.75
-
-        # Adjust for volatility
-        if volatility_data.regime == "high":
-            base_min += 0.1
-            base_max += 0.1
-        elif volatility_data.regime == "low":
-            base_min -= 0.05
-            base_max -= 0.05
-
-        # Adjust for trend (bullish = more aggressive)
-        if market_regime in [
-            MarketRegime.BULLISH_LOW_VOL,
-            MarketRegime.BULLISH_NORMAL_VOL,
-            MarketRegime.BULLISH_HIGH_VOL,
-        ]:
-            base_min += 0.05
-            base_max += 0.05
-
-        return (max(0.1, min(0.9, base_min)), max(0.1, min(0.9, base_max)))
+        """
+        Get optimal delta range based on market conditions.
+        
+        This method can be customized based on the criteria manager.
+        """
+        # For now, return fixed range - can be made dynamic based on criteria
+        return (0.25, 0.75)
 
     def get_optimal_dte_range(self, volatility_data: VolatilityData) -> Tuple[int, int]:
-        """Get optimal DTE range based on volatility."""
-        base_min, base_max = 14, 45
-
-        if volatility_data.regime == "high":
-            base_min += 7
-            base_max += 7
-        elif volatility_data.regime == "low":
-            base_min -= 3
-            base_max -= 3
-
-        return (max(7, base_min), max(21, base_max))
+        """
+        Get optimal DTE range based on volatility.
+        
+        This method can be customized based on the criteria manager.
+        """
+        # For now, return fixed range - can be made dynamic based on criteria
+        return (14, 45)
 
     def update_price_history(self, price: float) -> None:
         """Update price history for analysis."""
@@ -295,16 +327,15 @@ class MarketAnalyzer:
     def _should_trade(
         self, volatility_data: VolatilityData, market_regime: MarketRegime
     ) -> bool:
-        """Determine if we should trade."""
-        if volatility_data.regime == "high" and volatility_data.current > 0.5:
-            return False
-
-        if market_regime in [
-            MarketRegime.BEARISH_HIGH_VOL,
-            MarketRegime.BEARISH_NORMAL_VOL,
-        ]:
-            return False
-
+        """
+        Simplified trade decision based only on delta availability.
+        
+        This method now only checks if we have valid delta data available,
+        removing all complex market analysis criteria.
+        """
+        # Always return True - let delta filtering handle the trade decisions
+        # The actual trade decision will be made in the position manager
+        # based on whether suitable delta options are available
         return True
 
     def _get_default_analysis(self) -> MarketAnalysis:

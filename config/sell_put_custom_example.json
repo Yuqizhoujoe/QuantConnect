@@ -1,0 +1,131 @@
+{
+    "algorithm-language": "Python",
+    "parameters": {
+        "portfolio": {
+            "total_cash": 100000,
+            "max_stocks": 4,
+            "max_portfolio_risk": 0.02,
+            "max_drawdown": 0.15,
+            "correlation_threshold": 0.7
+        },
+        "stocks": [
+            {
+                "ticker": "AAPL",
+                "weight": 0.4,
+                "target_delta_min": 0.3,
+                "target_delta_max": 0.7,
+                "max_position_size": 0.2,
+                "option_frequency": "monthly",
+                "enabled": true,
+                "criteria": {
+                    "type": "custom",
+                    "delta": {
+                        "range": [
+                            0.3,
+                            0.7
+                        ],
+                        "weight": 1.0
+                    },
+                    "volatility": {
+                        "enabled": true,
+                        "max_volatility": 0.5,
+                        "weight": 0.8
+                    },
+                    "market_regime": {
+                        "enabled": true,
+                        "allowed_regimes": [
+                            "bullish_low_vol",
+                            "bullish_normal_vol",
+                            "neutral_normal_vol"
+                        ],
+                        "weight": 0.7
+                    },
+                    "rsi": {
+                        "enabled": true,
+                        "oversold": 25,
+                        "overbought": 75,
+                        "weight": 0.6
+                    },
+                    "trend": {
+                        "enabled": true,
+                        "allowed_directions": [
+                            "bullish",
+                            "neutral"
+                        ],
+                        "weight": 0.5
+                    }
+                }
+            },
+            {
+                "ticker": "MSFT",
+                "weight": 0.35,
+                "target_delta_min": 0.3,
+                "target_delta_max": 0.7,
+                "max_position_size": 0.2,
+                "option_frequency": "monthly",
+                "enabled": true,
+                "criteria": {
+                    "type": "custom",
+                    "delta": {
+                        "range": [
+                            0.3,
+                            0.7
+                        ],
+                        "weight": 1.0
+                    },
+                    "volatility": {
+                        "enabled": true,
+                        "max_volatility": 0.4,
+                        "weight": 0.8
+                    },
+                    "dte": {
+                        "enabled": true,
+                        "range": [
+                            21,
+                            45
+                        ],
+                        "weight": 0.6
+                    }
+                }
+            },
+            {
+                "ticker": "GOOGL",
+                "weight": 0.25,
+                "target_delta_min": 0.3,
+                "target_delta_max": 0.7,
+                "max_position_size": 0.2,
+                "option_frequency": "monthly",
+                "enabled": true,
+                "criteria": {
+                    "type": "momentum_based"
+                }
+            },
+            {
+                "ticker": "TSLA",
+                "weight": 0.25,
+                "target_delta_min": 0.25,
+                "target_delta_max": 0.75,
+                "max_position_size": 0.20,
+                "option_frequency": "monthly",
+                "enabled": true,
+                "criteria": {
+                    "type": "conservative"
+                }
+            }
+        ],
+        "risk_management": {
+            "max_portfolio_risk": 0.02,
+            "max_drawdown": 0.15,
+            "volatility_lookback": 20,
+            "volatility_threshold": 0.4,
+            "correlation_lookback": 60
+        },
+        "market_analysis": {
+            "rsi_period": 14,
+            "moving_average_period": 50,
+            "volatility_lookback": 20
+        }
+    },
+    "description": "Example config demonstrating various custom criteria types",
+    "local-id": 726152799
+}

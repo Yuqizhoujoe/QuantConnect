@@ -60,38 +60,37 @@ class OptionContractSelector:
         target_delta_range: Tuple[float, float],
         get_delta_func,
     ) -> Optional[Any]:
-        """Select the best contract using multiple criteria."""
+        """
+        Simplified contract selection focused primarily on delta.
+        
+        Removes complex market analysis and focuses on delta proximity to target range.
+        """
         if not valid_contracts:
             return None
 
-        # Score each contract based on multiple criteria
+        # Calculate target delta (middle of range)
+        target_delta = (target_delta_range[0] + target_delta_range[1]) / 2
+
+        # Score each contract based primarily on delta
         scored_contracts = []
 
         for contract in valid_contracts:
             delta = abs(get_delta_func(contract))
+            
+            # Primary criterion: Delta proximity to target
+            delta_score = 1.0 - abs(delta - target_delta) / target_delta
+            
+            # Bonus for being in the middle of the target range
+            if target_delta_range[0] <= delta <= target_delta_range[1]:
+                delta_score += 0.3
+            
+            # Secondary criterion: DTE (prefer middle range)
             dte = (contract.Expiry.date() - date.today()).days
-
-            # Criterion 1: Strike proximity score
-            strike_distance = abs(contract.Strike - underlying_price) / underlying_price
-            strike_score = 1 - min(strike_distance, 0.1) / 0.1
-
-            # Criterion 2: Delta score (prefer middle of target range)
-            target_delta_mid = (target_delta_range[0] + target_delta_range[1]) / 2
-            delta_score = 1 - abs(delta - target_delta_mid) / target_delta_mid
-
-            # Criterion 3: DTE score (prefer optimal DTE)
-            optimal_dte = 45  # Middle of typical range (30-60 days)
-            dte_score = 1 - abs(dte - optimal_dte) / optimal_dte
-
-            # Criterion 4: Market regime adjustments
-            regime = market_analysis.market_regime
-            if regime == "bullish_low_vol":
-                strike_score *= 1.2  # Prefer higher strikes in bullish low vol
-            elif regime == "bearish_high_vol":
-                strike_score *= 0.8  # Prefer lower strikes in bearish high vol
-
-            # Calculate weighted total score
-            total_score = strike_score * 0.4 + delta_score * 0.4 + dte_score * 0.2
+            optimal_dte = 30  # Middle of typical range
+            dte_score = 1.0 - abs(dte - optimal_dte) / optimal_dte
+            
+            # Weighted score (80% delta, 20% DTE)
+            total_score = delta_score * 0.8 + dte_score * 0.2
             scored_contracts.append((contract, total_score))
 
         # Return contract with highest score
@@ -173,17 +172,12 @@ class OptionTradeLogger:
         market_analysis: MarketAnalysis,
         get_delta_func,
     ) -> None:
-        """Log trade entry information."""
-        algorithm.Log(
-            f"Market conditions: {market_analysis.market_regime}, "
-            f"Volatility: {market_analysis.volatility.regime}, "
-            f"RSI: {market_analysis.rsi:.1f}"
-        )
-
+        """Log trade entry information with focus on delta."""
+        delta = get_delta_func(contract)
         algorithm.Log(
             f"Sold short put: {contract.Symbol.Value}, "
-            f"Strike: {contract.Strike}, Qty: {quantity}, "
-            f"Delta: {get_delta_func(contract):.2f}"
+            f"Strike: ${contract.Strike}, Qty: {quantity}, "
+            f"Delta: {delta:.3f}"
         )
 
     @staticmethod
@@ -198,11 +192,11 @@ class OptionTradeLogger:
         target_delta: Tuple[float, float],
         available_deltas: Tuple[float, float],
     ) -> None:
-        """Log when no valid contracts are found."""
+        """Log when no valid contracts are found, focusing on delta ranges."""
         algorithm.Log(
-            f"No valid puts found. Market: {market_analysis.market_regime}, "
-            f"Target delta: {target_delta[0]:.2f}-{target_delta[1]:.2f}, "
-            f"Available: {available_deltas[0]:.2f}-{available_deltas[1]:.2f}"
+            f"No valid puts found. "
+            f"Target delta: {target_delta[0]:.3f}-{target_delta[1]:.3f}, "
+            f"Available: {available_deltas[0]:.3f}-{available_deltas[1]:.3f}"
         )
 
     @staticmethod

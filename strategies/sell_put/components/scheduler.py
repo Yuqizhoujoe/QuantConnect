@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .sell_put_strategy import SellPutOptionStrategy
+    from ..sell_put_strategy import SellPutOptionStrategy
 
 
 @dataclass

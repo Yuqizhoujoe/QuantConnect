@@ -61,7 +61,7 @@ class Config:
         risk = data.get("risk_management", {})
         market = data.get("market_analysis", {})
 
-        return cls(
+        config = cls(
             # Portfolio settings
             total_cash=portfolio.get("total_cash", 100000),
             max_stocks=portfolio.get("max_stocks", 1),
@@ -87,53 +87,8 @@ class Config:
             start_date=data.get("start_date", "2020-01-01"),
             end_date=data.get("end_date", "2025-01-01"),
         )
-
-
-class StrategyConfig:
-    """
-    Multi-stock configuration class for easy parameter modification.
-    Modify these values to change strategy behavior.
-    """
-
-    # Portfolio settings
-    TOTAL_CASH: int = 100000
-    MAX_STOCKS: int = 1  # Updated to 1
-    MAX_PORTFOLIO_RISK: float = 0.02
-    MAX_DRAWDOWN: float = 0.15
-    CORRELATION_THRESHOLD: float = 0.7
-
-    # Stock configurations - Updated to only include AAPL
-    STOCKS = [
-        {
-            "ticker": "AAPL",
-            "weight": 1.0,
-            "target_delta_min": 0.25,
-            "target_delta_max": 0.75,
-            "max_position_size": 0.20,
-            "option_frequency": "monthly",
-            "enabled": True,
-        }
-    ]
-
-    # Risk management settings
-    VOLATILITY_LOOKBACK: int = 20
-    VOLATILITY_THRESHOLD: float = 0.4
-    CORRELATION_LOOKBACK: int = 60
-
-    # Market analysis settings
-    RSI_PERIOD: int = 14
-    MOVING_AVERAGE_PERIOD: int = 50
-    MARKET_VOLATILITY_LOOKBACK: int = 20
-
-    # Legacy single-stock settings (for backward compatibility)
-    TICKER: str = "AAPL"  # Updated to AAPL
-    TARGET_DELTA_MIN: float = 0.25
-    TARGET_DELTA_MAX: float = 0.75
-    MAX_POSITION_SIZE: float = 0.20
-    OPTION_FREQUENCY: str = "monthly"
-    START_DATE: str = "2020-01-01"
-    END_DATE: str = "2025-01-01"
-    CASH: int = TOTAL_CASH
+        
+        return config
 
 
 class ConfigLoader:
@@ -144,7 +99,37 @@ class ConfigLoader:
     """
 
     @staticmethod
-    def load_config(config_file: str = "config.json") -> Config:
+    def _find_config_file(config_file: str) -> Optional[str]:
+        """
+        Find the config file in various possible locations.
+        
+        Args:
+            config_file: The config file name or path
+            
+        Returns:
+            str: Full path to the config file if found, None otherwise
+        """
+        # Get the directory of this file (config/common_config_loader.py)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        
+        # Define possible paths to search
+        search_paths = [
+            config_file,  # Original path
+            os.path.join("config", config_file),  # config/config_file
+            os.path.join(project_root, config_file),  # project_root/config_file
+            os.path.join(project_root, "config", config_file),  # project_root/config/config_file
+        ]
+        
+        # Try each path
+        for path in search_paths:
+            if os.path.exists(path):
+                return path
+                
+        return None
+
+    @staticmethod
+    def load_config(config_file: str) -> Config:
         """
         Loads configuration from embedded settings or tries to load from file.
         Falls back to embedded configuration if file loading fails.
@@ -156,38 +141,20 @@ class ConfigLoader:
             Config: The loaded configuration object.
         """
         # Try to load from file
-        try:
-            # Handle file path correctly for Lean environment
-            # If config_file is a relative path, try to find it relative to the project root
-            config_path = config_file
-
-            # If the file doesn't exist in current directory, try to find it in the project root
-            if not os.path.exists(config_path):
-                # Get the directory of this file (config/common_config_loader.py)
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                # Go up one level to project root
-                project_root = os.path.dirname(current_dir)
-                # Try the config file in project root
-                config_path = os.path.join(project_root, config_file)
-
-                # If still not found, try in config directory
-                if not os.path.exists(config_path):
-                    config_path = os.path.join(project_root, "config", config_file)
-
-            with open(config_path, "r") as f:
-                file_config = json.load(f)
-                logging.info(f"Successfully loaded configuration from {config_path}")
-                # Create config from file
-                config = Config.from_dict(file_config)
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            logging.warning(
-                f"Error loading config file {config_file}: {e}. Using embedded configuration."
-            )
-            # Create default config
+        config_path = ConfigLoader._find_config_file(config_file)
+        
+        if config_path:
+            try:
+                with open(config_path, "r") as f:
+                    file_config = json.loads(f.read())
+                    logging.info(f"Successfully loaded configuration from {config_path}")
+                    config = Config.from_dict(file_config)
+            except (FileNotFoundError, json.JSONDecodeError) as e:
+                logging.warning(f"Error loading config file {config_path}: {e}. Using default configuration.")
+                config = Config()
+        else:
+            logging.warning(f"Config file {config_file} not found. Using default configuration.")
             config = Config()
-
-        # Log the loaded config for debugging
-        logging.info(f"Loaded Config: {config}")
 
         # Log the configuration being used
         if config.stocks:

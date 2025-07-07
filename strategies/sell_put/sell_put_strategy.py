@@ -5,19 +5,12 @@ from datetime import timedelta
 from shared.utils.constants import (
     DEFAULT_DAYS_TO_EXPIRATION_MIN,
     DEFAULT_DAYS_TO_EXPIRATION_MAX,
-    DEFAULT_TARGET_DELTA_MIN,
-    DEFAULT_TARGET_DELTA_MAX,
-    DEFAULT_VOLATILITY_LOOKBACK,
-    DEFAULT_VOLATILITY_THRESHOLD,
-    DEFAULT_SCHEDULE_TIME_HOUR,
-    DEFAULT_SCHEDULE_TIME_MINUTE,
     DEFAULT_STRIKES_BELOW,
     DEFAULT_STRIKES_ABOVE,
     SUCCESS_STRATEGY_INITIALIZED,
 )
+
 from .components.portfolio_manager import PortfolioManager
-from .components.stock_manager import StockManager
-from .components.position_manager import PositionManager
 from .components.scheduler import Scheduler
 from .components.evaluator import Evaluator
 
@@ -43,19 +36,12 @@ class SellPutOptionStrategy(QCAlgorithm):  # type: ignore
         This method is called once at the very beginning of the algorithm's lifecycle.
         """
         # Set backtest start and end dates
-        self.SetStartDate(start_date)  # Start: January 1, 2023
-        self.SetEndDate(end_date)  # End: December 31, 2023 (1 year)
+        self.SetStartDate(start_date)
+        self.SetEndDate(end_date)
 
         # Load configuration from config file
         self.config: Config = ConfigLoader.load_config(config_path)
-
-        # Debug logging for config
-        self.Log(
-            f"Config loaded - total_cash: {self.config.total_cash}, max_stocks: {self.config.max_stocks}"
-        )
-        self.Log(f"Config stocks count: {len(self.config.stocks)}")
-        for i, stock in enumerate(self.config.stocks):
-            self.Log(f"Stock {i}: {stock}")
+        self.Log(f"Configuration loaded - {len(self.config.stocks)} stocks configured")
 
         # Set up equity and option subscriptions for all configured stocks
         self.option_symbols: Dict[str, Any] = {}
@@ -83,7 +69,7 @@ class SellPutOptionStrategy(QCAlgorithm):  # type: ignore
 
         # --- Portfolio State Variables ---
         # Note: All portfolio tracking is now handled by the PortfolioManager
-        # These variables are kept for compatibility but not actively used
+        # These variables are kept for compatibility with existing components
         self.peak_portfolio_value: float = self.Portfolio.TotalPortfolioValue
 
         # --- Initialize Portfolio Management ---
@@ -101,20 +87,13 @@ class SellPutOptionStrategy(QCAlgorithm):  # type: ignore
             portfolio_volatility=[],
         )
 
-        # Initialize stock managers
-        self.Log(f"Initializing stock managers with {len(self.config.stocks)} stocks")
+        # Initialize stock managers (includes criteria manager setup)
         self.portfolio_manager.initialize_stocks(self.config.stocks)
-        self.Log(
-            f"Stock managers initialized: {len(self.portfolio_manager.stock_managers)}"
-        )
+        self.Log(f"Stock managers initialized: {len(self.portfolio_manager.stock_managers)}")
 
         # --- Initialize Helper Modules ---
-        self.scheduler: Scheduler = Scheduler(
-            strategy=self,
-        )
-        self.evaluator: Evaluator = Evaluator(
-            strategy=self,
-        )
+        self.scheduler: Scheduler = Scheduler(strategy=self)
+        self.evaluator: Evaluator = Evaluator(strategy=self)
 
         # Set up the scheduled event to evaluate the strategy logic periodically
         self.scheduler.setup_events()
@@ -130,9 +109,7 @@ class SellPutOptionStrategy(QCAlgorithm):  # type: ignore
 
         stock_count = len(self.portfolio_manager.stock_managers)
         strategy_type = "single-stock" if stock_count == 1 else "multi-stock"
-        self.Log(
-            f"{strategy_type.title()} strategy initialized with {stock_count} stock(s)"
-        )
+        self.Log(f"{strategy_type.title()} strategy initialized with {stock_count} stock(s)")
         self.Log(SUCCESS_STRATEGY_INITIALIZED)
 
     def OnData(self, slice: Slice) -> None:  # type: ignore
@@ -143,11 +120,6 @@ class SellPutOptionStrategy(QCAlgorithm):  # type: ignore
         Args:
             slice: The new data slice from the engine.
         """
-        # Log data arrival
-        self.Log(
-            f"OnData called at {self.Time} - Portfolio Value: ${self.Portfolio.TotalPortfolioValue:.2f}"
-        )
-
         # Update portfolio data
         self.portfolio_manager.update_portfolio_data(slice)
 
@@ -164,3 +136,5 @@ class SellPutOptionStrategy(QCAlgorithm):  # type: ignore
         This method delegates the final evaluation and logging to the Evaluator module.
         """
         self.evaluator.on_end_of_algorithm()
+
+

@@ -13,7 +13,6 @@ from shared.utils.constants import (
 )
 from .data_handler import DataHandler
 from .position_manager import PositionManager
-from .market_analyzer import MarketAnalyzer
 from .risk_manager import RiskManager
 from shared.utils.option_utils import OptionTradeLogger
 
@@ -21,7 +20,7 @@ from shared.utils.option_utils import OptionTradeLogger
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .sell_put_strategy import SellPutOptionStrategy
+    from ..sell_put_strategy import SellPutOptionStrategy
 
 
 @dataclass
@@ -70,7 +69,6 @@ class StockManager:
 
     # Analysis modules (initialized in __post_init__)
     data_handler: Optional[DataHandler] = field(default=None, init=False)
-    market_analyzer: Optional[MarketAnalyzer] = field(default=None, init=False)
     risk_manager: Optional[RiskManager] = field(default=None, init=False)
     position_manager: Optional[PositionManager] = field(default=None, init=False)
 
@@ -78,9 +76,6 @@ class StockManager:
         """Initialize modules and parameters after dataclass creation."""
         # Initialize stock-specific modules
         self.data_handler = DataHandler(strategy=self.strategy, ticker=self.ticker)
-        self.market_analyzer = MarketAnalyzer(
-            strategy=self.strategy, ticker=self.ticker
-        )
         self.risk_manager = RiskManager(strategy=self.strategy, ticker=self.ticker)
         self.position_manager = PositionManager(
             strategy=self.strategy,

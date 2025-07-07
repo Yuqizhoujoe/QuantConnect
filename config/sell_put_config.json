@@ -1,39 +1,40 @@
 {
-    "total_cash": 100000,
-    "max_stocks": 5,
-    "max_portfolio_risk": 0.02,
-    "stocks": [
-        {
-            "ticker": "AAPL",
-            "max_position_size": 1,
-            "min_dte": 30,
-            "max_dte": 60,
-            "min_delta": -0.3,
-            "max_delta": -0.1
+    "algorithm-language": "Python",
+    "parameters": {
+        "portfolio": {
+            "total_cash": 100000,
+            "max_stocks": 1,
+            "max_portfolio_risk": 0.05,
+            "max_drawdown": 0.20,
+            "correlation_threshold": 0.7
+        },
+        "stocks": [
+            {
+                "ticker": "AAPL",
+                "weight": 1.0,
+                "target_delta_min": 0.15,
+                "target_delta_max": 0.85,
+                "max_position_size": 0.3,
+                "option_frequency": "any",
+                "enabled": true,
+                "criteria": {
+                    "type": "delta_only"
+                }
+            }
+        ],
+        "risk_management": {
+            "max_portfolio_risk": 0.05,
+            "max_drawdown": 0.20,
+            "volatility_lookback": 20,
+            "volatility_threshold": 0.6,
+            "correlation_lookback": 60
+        },
+        "market_analysis": {
+            "rsi_period": 14,
+            "moving_average_period": 50,
+            "volatility_lookback": 20
         }
-    ],
-    "risk_management": {
-        "max_position_size": 1,
-        "stop_loss": 0.05,
-        "profit_target": 0.8,
-        "max_portfolio_risk": 0.02
     },
-    "market_analysis": {
-        "use_technical_indicators": true,
-        "rsi_period": 14,
-        "rsi_oversold": 30,
-        "rsi_overbought": 70,
-        "sma_period": 20,
-        "ema_period": 12
-    },
-    "scheduling": {
-        "evaluation_time": "11:00",
-        "evaluation_days": [
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday"
-        ]
-    }
+    "description": "Single-stock AAPL short put strategy with loose criteria for easy trading",
+    "local-id": 726152798
 }

@@ -6,15 +6,13 @@ from shared.utils.position_utils import PositionUtil, RiskLimits
 from shared.utils.constants import (
     DEFAULT_VOLATILITY_LOOKBACK,
     DEFAULT_VOLATILITY_THRESHOLD,
-    DEFAULT_MAX_POSITION_SIZE,
-    DEFAULT_MAX_PNL_HISTORY_LENGTH,
     DEFAULT_MAX_PORTFOLIO_RISK,
     DEFAULT_MAX_DRAWDOWN,
 )
 from dataclasses import dataclass, field
 
 if TYPE_CHECKING:
-    from .sell_put_strategy import SellPutOptionStrategy
+    from ..sell_put_strategysell_put_strategy import SellPutOptionStrategy
 
 
 @dataclass

@@ -25,10 +25,10 @@ class OptionStrategy(SellPutOptionStrategy):  # Change to CoveredCallStrategy to
         from datetime import datetime
 
         start_date = datetime(
-            2022, 1, 1
-        )  # Updated to 2022 for better option data availability
-        end_date = datetime(2023, 12, 31)  # Updated to 2023 for comprehensive testing
-        config_path = "sell_put_stock.json"  # Config file copied to root directory
+            2020, 1, 1
+        )  # Updated to 2020 for available option data
+        end_date = datetime(2024, 12, 31)  # Updated to 2024 for available option data
+        config_path = "config/sell_put_config.json"  # Config file in config directory
         super().Initialize(start_date, end_date, config_path)
         self.Log(f"Initialized strategy: {self.__class__.__bases__[0].__name__}")
         self.Log(f"Testing period: {start_date.date()} to {end_date.date()}")

@@ -1,6 +1,6 @@
 from AlgorithmImports import *  # type: ignore
-from datetime import timedelta, date
-from typing import Dict, List, Optional, Any, Tuple, Union, TYPE_CHECKING
+from datetime import timedelta
+from typing import List, Optional, Any, Tuple, TYPE_CHECKING
 from .risk_manager import RiskManager
 from .market_analyzer import MarketAnalyzer
 from shared.utils.option_utils import (
@@ -8,12 +8,13 @@ from shared.utils.option_utils import (
     OptionDataValidator,
     OptionTradeLogger,
 )
+from shared.utils.trading_criteria import TradingContext
 from .data_handler import DataHandler
 from shared.utils.market_analysis_types import MarketAnalysis
 from dataclasses import dataclass, field
 
 if TYPE_CHECKING:
-    from .sell_put_strategy import SellPutOptionStrategy
+    from ..sell_put_strategy import SellPutOptionStrategy
 
 
 @dataclass
@@ -130,7 +131,7 @@ class PositionManager:
         self,
     ) -> Tuple[Optional[MarketAnalysis], Tuple[float, float], Tuple[int, int]]:
         """
-        Perform market analysis and get dynamic trading parameters.
+        Simplified parameter selection focused on delta-based decisions.
 
         Returns:
             Tuple of (market_analysis, delta_range, dte_range) or (None, None, None) if analysis fails
@@ -142,31 +143,20 @@ class PositionManager:
         underlying_price: float = chain.Underlying.Price
         self.strategy.Log(f"{self.ticker} underlying price: ${underlying_price:.2f}")
 
-        # Perform comprehensive market analysis
+        # Perform simplified market analysis (now just checks if we have price data)
         market_analysis: MarketAnalysis = (
             self.market_analyzer.analyze_market_conditions(underlying_price)
         )
 
-        # Get dynamic trading parameters based on market conditions
-        optimal_delta_range: Tuple[float, float] = (
-            self.market_analyzer.get_optimal_delta_range(
-                market_analysis.market_regime, market_analysis.volatility
-            )
-        )
-
-        optimal_dte_range: Tuple[int, int] = self.market_analyzer.get_optimal_dte_range(
-            market_analysis.volatility
-        )
-
-        # Use dynamic ranges or fall back to configured ranges
-        delta_min, delta_max = optimal_delta_range
-        dte_min, dte_max = optimal_dte_range
+        # Use fixed delta and DTE ranges for all conditions
+        delta_range: Tuple[float, float] = (0.25, 0.75)  # Fixed range
+        dte_range: Tuple[int, int] = (14, 45)  # Fixed range
 
         self.strategy.Log(
-            f"{self.ticker} target delta range: {delta_min:.2f}-{delta_max:.2f}, DTE range: {dte_min}-{dte_max}"
+            f"{self.ticker} target delta range: {delta_range[0]:.2f}-{delta_range[1]:.2f}, DTE range: {dte_range[0]}-{dte_range[1]}"
         )
 
-        return market_analysis, (delta_min, delta_max), (dte_min, dte_max)
+        return market_analysis, delta_range, dte_range
 
     def _filter_and_select_contracts(
         self,
@@ -175,12 +165,12 @@ class PositionManager:
         market_analysis: MarketAnalysis,
     ) -> Optional[Any]:
         """
-        Filter available contracts and select the optimal one.
+        Simplified contract selection focused on delta-based filtering.
 
         Args:
             delta_range: Target delta range (min, max)
             dte_range: Target DTE range (min, max)
-            market_analysis: Current market analysis
+            market_analysis: Current market analysis (simplified)
 
         Returns:
             Selected contract or None if no suitable contract found
@@ -190,13 +180,13 @@ class PositionManager:
         chain: Any = slice_data.OptionChains.get(option_symbol)
         underlying_price: float = chain.Underlying.Price
 
-        # Calculate dynamic expiry window based on market conditions
+        # Calculate expiry window
         expiry_window: Tuple[Any, Any] = (
             self.strategy.Time + timedelta(days=dte_range[0]),
             self.strategy.Time + timedelta(days=dte_range[1]),
         )
 
-        # Filter for put options using option utilities
+        # Filter for put options
         puts: List[Any] = OptionContractSelector.filter_put_options(chain)
         self.strategy.Log(f"{self.ticker} found {len(puts)} put options")
 
@@ -204,24 +194,12 @@ class PositionManager:
             self.strategy.Log(f"{self.ticker} no put options available")
             return None
 
-        # Apply frequency filter using option utilities
-        puts = OptionContractSelector.filter_by_frequency(
-            puts, self.strategy.stock_manager.option_frequency
-        )
-        self.strategy.Log(f"{self.ticker} after frequency filter: {len(puts)} puts")
-
-        if not puts:
-            self.strategy.Log(
-                f"{self.ticker} no put options available for the selected frequency"
-            )
-            return None
-
-        # Filter by dynamic expiry window and delta range using option utilities
+        # Filter by expiry window
         expiry_window_dates = (expiry_window[0].date(), expiry_window[1].date())
         puts = OptionContractSelector.filter_by_expiry_window(puts, expiry_window_dates)
         self.strategy.Log(f"{self.ticker} after expiry filter: {len(puts)} puts")
 
-        # Filter by delta range
+        # Filter by delta range (primary criteria)
         valid_puts = OptionContractSelector.filter_by_delta_range(
             puts, delta_range, self.data_handler.get_option_delta
         )
@@ -230,36 +208,112 @@ class PositionManager:
         )
 
         if not valid_puts:
-            # Log when no valid contracts are found using option utilities
+            # Log available deltas for debugging
             available_deltas = OptionContractSelector.get_available_deltas(
                 puts, expiry_window_dates, self.data_handler.get_option_delta
             )
-            OptionTradeLogger.log_no_valid_contracts(
-                self.strategy, market_analysis, delta_range, available_deltas
+            self.strategy.Log(
+                f"{self.ticker} no valid puts found. Target delta: {delta_range[0]:.2f}-{delta_range[1]:.2f}, Available: {available_deltas[0]:.2f}-{available_deltas[1]:.2f}"
             )
             return None
 
-        self.strategy.Log(
-            f"valid puts: {valid_puts}, underlying price: {underlying_price}, market analysis: {market_analysis}, delta range: {delta_range}, expiry window: {expiry_window_dates}"
-        )
+        # Select the best contract based primarily on delta proximity
+        selected_contract = self._select_best_contract_by_delta(valid_puts, delta_range)
 
-        # Select optimal contract using option utilities
-        selected_contract: Optional[Any] = OptionContractSelector.select_best_contract(
-            valid_puts,
-            underlying_price,
-            market_analysis,
-            delta_range,
-            self.data_handler.get_option_delta,
-        )
+        if selected_contract:
+            delta = abs(self.data_handler.get_option_delta(selected_contract))
+            self.strategy.Log(
+                f"{self.ticker} selected contract: {selected_contract.Symbol.Value}, Strike: ${selected_contract.Strike}, Delta: {delta:.3f}"
+            )
 
-        if not selected_contract:
-            self.strategy.Log(f"{self.ticker} no contract selected")
+        return selected_contract
+
+    def _select_best_contract_by_delta(
+        self, valid_puts: List[Any], delta_range: Tuple[float, float]
+    ) -> Optional[Any]:
+        """
+        Select the best contract using criteria-based evaluation.
+        
+        Args:
+            valid_puts: List of valid put contracts
+            delta_range: Target delta range
+
+        Returns:
+            Best contract or None
+        """
+        if not valid_puts:
             return None
 
-        self.strategy.Log(
-            f"{self.ticker} selected contract: {selected_contract.Symbol.Value}, Strike: ${selected_contract.Strike}"
-        )
-        return selected_contract
+        # Score contracts using criteria system
+        scored_contracts = []
+        for contract in valid_puts:
+            delta = abs(self.data_handler.get_option_delta(contract))
+            dte = (contract.Expiry.date() - self.strategy.Time.date()).days
+            
+            # Create context for criteria evaluation
+            underlying_price = self._get_underlying_price()
+            
+            # Get market analysis for additional context
+            market_analysis = None
+            if self.market_analyzer:
+                market_analysis = self.market_analyzer.analyze_market_conditions(underlying_price)
+            
+            # Create TradingContext
+            context = TradingContext(
+                delta=delta,
+                dte=dte,
+                strike=contract.Strike,
+                underlying_price=underlying_price,
+                volatility=market_analysis.volatility.current if market_analysis else 0.0,
+                market_regime=market_analysis.market_regime.value if market_analysis else "unknown",
+                rsi=market_analysis.rsi if market_analysis else 50.0,
+                trend_direction=market_analysis.trend.direction if market_analysis else "neutral",
+                trend_strength=market_analysis.trend.strength if market_analysis else 0.5,
+                contract=contract,
+                timestamp=str(self.strategy.Time)
+            )
+            
+            # Evaluate using criteria manager if available
+            if self.market_analyzer and self.market_analyzer.criteria_manager:
+                should_trade, score, message = self.market_analyzer.criteria_manager.should_trade(context)
+                if should_trade:
+                    scored_contracts.append((contract, score))
+                    self.strategy.Log(f"{self.ticker}: Contract {contract.Symbol.Value} scored {score:.3f} - {message}")
+                else:
+                    self.strategy.Log(f"{self.ticker}: Contract {contract.Symbol.Value} rejected - {message}")
+            else:
+                # Fallback to simple delta-based scoring
+                target_delta = (delta_range[0] + delta_range[1]) / 2
+                delta_score = 1.0 - abs(delta - target_delta) / target_delta
+                if delta_range[0] <= delta <= delta_range[1]:
+                    delta_score += 0.2
+                scored_contracts.append((contract, delta_score))
+
+        # Sort by score and return the best
+        if scored_contracts:
+            scored_contracts.sort(key=lambda x: x[1], reverse=True)
+            return scored_contracts[0][0]
+        
+        return None
+
+    def _get_underlying_price(self) -> float:
+        """Get the current underlying price."""
+        try:
+            slice_data = self.data_handler.latest_slice
+            if not slice_data or not hasattr(slice_data, 'OptionChains'):
+                return 0.0
+                
+            option_symbol = self.strategy.option_symbols.get(self.ticker)
+            if not option_symbol:
+                return 0.0
+                
+            chain = slice_data.OptionChains.get(option_symbol)
+            if not chain or not hasattr(chain, 'Underlying'):
+                return 0.0
+                
+            return chain.Underlying.Price
+        except:
+            return 0.0
 
     def _execute_trade(
         self, selected_contract: Any, market_analysis: MarketAnalysis
