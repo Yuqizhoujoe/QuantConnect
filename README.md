@@ -486,32 +486,3 @@ flake8 .
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## ⚠️ Disclaimer
-
-**This software is for educational and research purposes only.**
-
-- Past performance does not guarantee future results
-- Trading options involves substantial risk
-- Not suitable for all investors
-- Always test strategies thoroughly before live trading
-- Consult with financial advisors before making investment decisions
-
-## 📞 Support
-
-### Getting Help
-
-- **Issues**: Create an issue on GitHub
-- **Discussions**: Use GitHub Discussions
-- **Documentation**: Check the docs folder
-- **Examples**: See the examples directory
-
-### Community
-
-- **QuantConnect Forum**: [forum.quantconnect.com](https://forum.quantconnect.com)
-- **Discord**: Join our community server
-- **Email**: support@quantconnet.com
-
----
-
-**Happy Trading! 📈**
